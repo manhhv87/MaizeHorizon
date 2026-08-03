@@ -30,7 +30,9 @@ MaizeHorizon is a forward-motion, range-stratified per-plant maize benchmark: 28
 frames at 1920x1080, and 3 held-out test clips hand-labelled with 4,067 plant and 941 ignore
 boxes, stratified near / mid / far by pixels-on-target.
 
-Download: Zenodo DOI, to be added.
+Download: [doi:10.5281/zenodo.21769524](https://doi.org/10.5281/zenodo.21769524) (CC BY 4.0).
+Two archives, `MaizeHorizon-images.tar` and `MaizeHorizon-annotations.tar.gz`, both unpacking
+into a single `data/` directory.
 
 ## Install
 
@@ -39,7 +41,10 @@ git lfs install                      # the checkpoints are stored via Git LFS
 git clone https://github.com/manhhv87/MaizeHorizon.git
 cd MaizeHorizon
 pip install -r requirements.txt      # ultralytics 8.3.160 + torch
-# unpack the Zenodo dataset into ./data
+
+# fetch the dataset from Zenodo and unpack it into ./data
+tar -xf  MaizeHorizon-images.tar
+tar -xzf MaizeHorizon-annotations.tar.gz
 ```
 
 The 36 trained checkpoints (12 arms x 3 seeds, 916 MB) are in `runs/` via Git LFS, so every
@@ -110,6 +115,15 @@ Two things to know:
   title  = {Resolved Sensor Pixels Limit Far-Field Per-Plant Maize Detection:
             Network Input Size Does Not Extend Range},
   year   = {2026}
+}
+
+@dataset{maizehorizon_data,
+  title     = {MaizeHorizon: a forward-motion, range-stratified per-plant maize
+               detection dataset},
+  year      = {2026},
+  publisher = {Zenodo},
+  version   = {1.0.0},
+  doi       = {10.5281/zenodo.21769524}
 }
 ```
 
