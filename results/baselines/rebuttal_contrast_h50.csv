@@ -1,0 +1,4 @@
+contrast_tercile,h50_phys_px,recall_near,recall_mid,recall_far,n_gt
+low,57.34,0.6827,0.1083,0.0,4062
+mid,52.21,0.7515,0.1699,0.1667,4077
+high,48.08,0.7603,0.3191,0.2593,4062

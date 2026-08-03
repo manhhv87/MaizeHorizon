@@ -1,0 +1,2 @@
+imgsz,h50_phys_px,recall_near,recall_mid,recall_far,n_seeds
+1920,53.22,0.5933,0.0245,0.0,3

@@ -1,0 +1,19 @@
+# CornHorizon -- reproduction environment
+# Tested on: Python 3.11, Ubuntu, NVIDIA RTX 5060 Ti (CUDA 13.0)
+#
+#   pip install -r requirements.txt
+#
+# Install torch matching your CUDA version first, e.g.:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu130
+
+ultralytics==8.3.160     # pinned: the evaluation protocol depends on its NMS/predict behaviour
+torch>=2.5
+numpy>=1.24
+opencv-python>=4.8
+scipy>=1.11
+matplotlib>=3.7
+pyyaml>=6.0
+tqdm>=4.65
+
+# exp_oracle_probe.py only (archived; not needed to reproduce the paper)
+# scikit-learn>=1.3
