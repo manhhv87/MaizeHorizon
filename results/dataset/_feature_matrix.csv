@@ -1,0 +1,8 @@
+dataset,Per-plant maize,Forward-to-horizon,Quantified far tier,Ignore class,Clip-disjoint splits,Per-plant track IDs
+Veridis,yes,no,no,no,no,no
+CropFollow / Sivakumar et al.,no,yes,no,no,no,no
+CRDLD,no,no,no,no,no,no
+MSDD,yes,no,no,no,no,no
+CornWeed,yes,no,no,no,no,no
+WeedMaize,yes,no,no,no,no,no
+CornHorizon (ours),yes,yes,yes,yes,yes,yes
