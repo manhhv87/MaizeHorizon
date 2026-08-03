@@ -1,14 +1,13 @@
 # MaizeHorizon
 
-Resolved sensor pixels limit far-field per-plant maize detection: network input size does not
-extend range.
+Far-field per-plant maize detection range saturates with network input size.
 
 Code and evaluation protocol for a study of how far ahead a ground robot can detect individual
 maize seedlings. A forward-facing camera driving down a crop row turns per-plant detection into a
 far-field small-object problem: a distant seedling spans a handful of pixels and blends into the
-soil. We show that detectability is governed by the pixels the sensor resolves on the plant, not by
-the network input size, and that three intuitive forward-motion remedies all fail to recover the
-far tier.
+soil. We show that detection range stops responding to the network input above a modest size, that
+resolved pixels stop predicting detectability at the floor itself, and that three intuitive
+forward-motion remedies all fail to recover the far tier.
 
 ## Key result
 
@@ -17,12 +16,14 @@ Evaluating one detector at input sizes 640 to 1920 separates cause from symptom:
 | Stratify recall by | Behaviour |
 |---|---|
 | input pixels-on-target (POT) | curves shift with input size |
-| native box height (sensor pixels) | curves collapse onto one function for inputs >= 960 |
+| native box height | equivalent across inputs >= 960, within +/-0.073 recall |
 
-Half-recall sits near a 52 px native box height. Recall falls to near zero below about 12 px POT,
-the scale at which our annotators could no longer individuate a plant either. Detection range is
-therefore extended by more sensor pixels, a longer focal length or a shorter stand-off, not by a
-bigger network input.
+Across 24 paired comparisons among inputs 960, 1280 and 1920, every difference falls inside
++/-0.073 recall and 12 favour the larger input against 12 the smaller, so there is no systematic
+gain. Half-recall sits near a 52 px native box height, but that height is not a sensor constant: it
+moves with plant-soil contrast (48 to 57 px), and matching plants on apparent size shows recall
+falling by up to 0.31 with viewing distance below 40 px native. Resolved pixels account for
+detectability on resolved plants and stop doing so at the floor.
 
 ## Dataset
 
@@ -30,7 +31,7 @@ MaizeHorizon is a forward-motion, range-stratified per-plant maize benchmark: 28
 frames at 1920x1080, and 3 held-out test clips hand-labelled with 4,067 plant and 941 ignore
 boxes, stratified near / mid / far by pixels-on-target.
 
-Download: [doi:10.5281/zenodo.21769524](https://doi.org/10.5281/zenodo.21769524) (CC BY 4.0).
+Download: [doi:10.5281/zenodo.21775699](https://doi.org/10.5281/zenodo.21775699) (CC BY 4.0).
 Two archives, `MaizeHorizon-images.tar` and `MaizeHorizon-annotations.tar.gz`, both unpacking
 into a single `data/` directory.
 
@@ -104,7 +105,10 @@ Two things to know:
 |---|---|
 | `eval_testset.py`, `eval_ap.py` | evaluation protocol: POT-stratified, ignore-aware, one-to-one greedy IoU |
 | `rebuttal_common.py` | shared loader and helpers; other scripts import the protocol rather than reimplementing it |
-| `exp_resolution_sweep.py` | the sensor-versus-input dissociation |
+| `exp_resolution_sweep.py` | recall against native height vs against input POT |
+| `exp_equivalence.py` | paired equivalence test across input sizes |
+| `exp_range_matched.py` | recall at matched apparent size, split by viewing distance |
+| `exp_cluster_ci.py` | intervals clustered by plant rather than by box |
 | `tbxrd_mint.py`, `train_tbxrd_stage2.py`, `mve_tbd.py` | the three forward-motion remedies |
 | `furrowmap_*.py` | count-when-near baseline |
 
@@ -112,8 +116,8 @@ Two things to know:
 
 ```bibtex
 @article{maizehorizon,
-  title  = {Resolved Sensor Pixels Limit Far-Field Per-Plant Maize Detection:
-            Network Input Size Does Not Extend Range},
+  title  = {Far-Field Per-Plant Maize Detection Range Saturates with
+            Network Input Size},
   year   = {2026}
 }
 
@@ -123,7 +127,7 @@ Two things to know:
   year      = {2026},
   publisher = {Zenodo},
   version   = {1.0.0},
-  doi       = {10.5281/zenodo.21769524}
+  doi       = {10.5281/zenodo.21775699}
 }
 ```
 
