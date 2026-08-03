@@ -47,7 +47,7 @@ def main():
 
     YOLO(a.weights).train(
         trainer=TBXRDDetectionTrainer, data=a.data, epochs=a.epochs, patience=a.patience, imgsz=a.imgsz,
-        batch=a.batch, device=a.device, name=a.name, seed=a.seed, project="runs", prune=False,
+        batch=a.batch, device=a.device, name=a.name, seed=a.seed, project="runs",
         # geometric augmentation must be off so the far box stays aligned with its RoI
         mosaic=0.0, close_mosaic=0, mixup=0.0, copy_paste=0.0,
         fliplr=0.0, flipud=0.0, degrees=0.0, translate=0.0, scale=0.0, shear=0.0, perspective=0.0,
