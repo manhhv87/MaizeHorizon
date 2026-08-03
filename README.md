@@ -1,4 +1,4 @@
-# CornHorizon
+# MaizeHorizon
 
 Resolved sensor pixels limit far-field per-plant maize detection: network input size does not
 extend range.
@@ -26,7 +26,7 @@ bigger network input.
 
 ## Dataset
 
-CornHorizon is a forward-motion, range-stratified per-plant maize benchmark: 28 clips, 5,979
+MaizeHorizon is a forward-motion, range-stratified per-plant maize benchmark: 28 clips, 5,979
 frames at 1920x1080, and 3 held-out test clips hand-labelled with 4,067 plant and 941 ignore
 boxes, stratified near / mid / far by pixels-on-target.
 
@@ -106,7 +106,7 @@ Two things to know:
 ## Citation
 
 ```bibtex
-@article{cornhorizon,
+@article{maizehorizon,
   title  = {Resolved Sensor Pixels Limit Far-Field Per-Plant Maize Detection:
             Network Input Size Does Not Extend Range},
   year   = {2026}

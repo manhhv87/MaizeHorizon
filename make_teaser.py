@@ -47,7 +47,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--image", required=True)
     ap.add_argument("--label", required=True)
-    ap.add_argument("--out", default="cornhorizon_example.jpg")
+    ap.add_argument("--out", default="maizehorizon_example.jpg")
     ap.add_argument("--inset", type=int, default=220, help="canh inset (px)")
     ap.add_argument("--plant-class", type=int, default=0)
     ap.add_argument("--ignore-class", type=int, default=1)

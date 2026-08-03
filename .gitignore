@@ -205,7 +205,7 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
-# ---- CornHorizon: khong dua len GitHub (xem LAYOUT.md) ----
+# ---- MaizeHorizon: khong dua len GitHub (xem LAYOUT.md) ----
 # du lieu + trong so: cong bo qua Zenodo, khong qua git
 data/
 *.zip
