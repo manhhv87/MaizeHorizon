@@ -35,9 +35,16 @@ Download: Zenodo DOI, to be added.
 ## Install
 
 ```bash
+git lfs install                      # the checkpoints are stored via Git LFS
+git clone https://github.com/manhhv87/ResolvedSensor.git
+cd ResolvedSensor
 pip install -r requirements.txt      # ultralytics 8.3.160 + torch
 # unpack the Zenodo dataset into ./data
 ```
+
+The 36 trained checkpoints (12 arms x 3 seeds, 916 MB) are in `runs/` via Git LFS, so every
+number in `results/` can be checked without retraining. `git clone` without Git LFS installed
+gives you the code and result tables but leaves the weights as pointer files.
 
 ## Layout
 
@@ -48,7 +55,7 @@ data/
 ├── arms/{stock,nearfar}/    per-arm labels, train.txt, valid.txt, data.yaml
 └── mint/<clip>/             minted labels and pairs.jsonl (10,355 near/far pairs)
 results/                     every number in the paper, as CSV
-runs/<tag>_s<seed>/          best.pt, args.yaml, results.csv
+runs/<tag>_s<seed>/          best.pt (Git LFS), args.yaml, results.csv
 ```
 
 Each arm's `images/` is a symlink to `data/images`, so no image bytes are duplicated. Ultralytics
