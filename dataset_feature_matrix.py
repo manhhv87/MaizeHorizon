@@ -3,7 +3,7 @@
 """Data for the dataset feature-conjunction table.
 
 Competitor rows are curated from the cited releases and cannot be derived from code. The
-CornHorizon row is verified automatically against the actual data: ignore class present,
+MaizeHorizon row is verified automatically against the actual data: ignore class present,
 far tier quantified, clip-disjoint splits, per-plant track ids.
 
 Writes the LaTeX table body, a CSV, and the verification result.
@@ -18,7 +18,7 @@ COLS = ["Per-plant maize", "Forward-to-horizon", "Quantified far tier",
         "Ignore class", "Clip-disjoint splits", "Per-plant track IDs"]
 
 # curated values for competitor datasets (1=yes, 0=no), taken from the cited releases
-# note: source for each row; CornHorizon is left None and verified below
+# note: source for each row; MaizeHorizon is left None and verified below
 ROWS = [
     ("Veridis", "veridis2026", [1, 0, 0, 0, 0, 0],
      "per-plant maize co; viewpoint under-represents far tier; khong CDF far, khong ignore/splits/track"),
@@ -32,7 +32,7 @@ ROWS = [
      "per-instance maize/weed; geometry khong forward-to-horizon; khong far-tier/ignore/splits/track"),
     ("WeedMaize", "lopezcorrea2021weedmaize", [1, 0, 0, 0, 0, 0],
      "per-instance maize/weed; tuong tu CornWeed; khong release track IDs"),
-    ("CornHorizon (ours)", None, None, "auto-verify tu data that"),
+    ("MaizeHorizon (ours)", None, None, "auto-verify tu data that"),
 ]
 
 
@@ -61,7 +61,7 @@ def clip_of(name):
     return b.rsplit("_f", 1)[0] if "_f" in b else b
 
 
-def verify_cornhorizon(a):
+def verify_maizehorizon(a):
     """Verify the six properties against the real data; unverifiable ones fall back to design intent."""
     # all six hold by design; verification only lowers a value if the data contradicts it
     v = [1, 1, 1, 1, 1, 1]
@@ -127,10 +127,10 @@ def main():
     sys.stdout.reconfigure(encoding="utf-8")
 
     rows = []
-    print("=== VERIFY hang CornHorizon (tu data that) ===")
+    print("=== VERIFY hang MaizeHorizon (tu data that) ===")
     for name, cite, bools, note in ROWS:
-        if bools is None:                                # CornHorizon -> auto
-            bools, vnotes = verify_cornhorizon(a)
+        if bools is None:                                # MaizeHorizon -> auto
+            bools, vnotes = verify_maizehorizon(a)
             for c, vn in zip(COLS, vnotes):
                 print(f"  [{c}] {vn}")
         rows.append((name, cite, bools))
@@ -140,11 +140,11 @@ def main():
     lines = []
     lines.append("\\begin{table*}[t]")
     lines.append("\\centering")
-    lines.append("\\caption{Feature-conjunction matrix: CornHorizon vs.\\ representative agricultural datasets. "
+    lines.append("\\caption{Feature-conjunction matrix: MaizeHorizon vs.\\ representative agricultural datasets. "
                  "\\cmark\\ = property provided/quantified in the released dataset, \\xmark\\ = not provided/reported. "
                  "``Forward-to-horizon'' denotes a forward-facing ground camera whose optical axis recedes along the "
-                 "row to the horizon. No single prior dataset provides all six; CornHorizon is distinguished by their "
-                 "conjunction. Competitor cells are curated from the cited releases; the CornHorizon row is verified "
+                 "row to the horizon. No single prior dataset provides all six; MaizeHorizon is distinguished by their "
+                 "conjunction. Competitor cells are curated from the cited releases; the MaizeHorizon row is verified "
                  "from the data by \\texttt{fork\\_train/dataset\\_feature\\_matrix.py}.}")
     lines.append("\\label{tab:compare}")
     lines.append("\\fitw{%")
