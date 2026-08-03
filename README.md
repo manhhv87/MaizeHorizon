@@ -36,8 +36,8 @@ Download: Zenodo DOI, to be added.
 
 ```bash
 git lfs install                      # the checkpoints are stored via Git LFS
-git clone https://github.com/manhhv87/ResolvedSensor.git
-cd ResolvedSensor
+git clone https://github.com/manhhv87/MaizeHorizon.git
+cd MaizeHorizon
 pip install -r requirements.txt      # ultralytics 8.3.160 + torch
 # unpack the Zenodo dataset into ./data
 ```
