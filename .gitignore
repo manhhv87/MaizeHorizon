@@ -208,9 +208,13 @@ __marimo__/
 # ---- CornHorizon: khong dua len GitHub (xem LAYOUT.md) ----
 # du lieu + trong so: cong bo qua Zenodo, khong qua git
 data/
-runs/
-*.pt
 *.zip
+
+# COCO-pretrained weights: ultralytics downloads these automatically
+/yolov8s.pt
+/yolo11s.pt
+/yolov10s.pt
+/rtdetr-l.pt
 
 # fork ultralytics: cai qua pip (requirements.txt ghim ultralytics==8.3.160)
 ultralytics/
