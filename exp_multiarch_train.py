@@ -88,8 +88,7 @@ def main():
         train_kwargs = dict(
             data=a.data, epochs=a.epochs, imgsz=a.imgsz, batch=a.batch,
             device=a.device, seed=seed, deterministic=True, patience=a.patience,
-            optimizer=a.optimizer, project=a.runs, name=name, exist_ok=True,
-            prune=False,   # fork tich hop torch-pruning; PHAI tat (giong train.py cua repo)
+            optimizer=a.optimizer, project=a.runs, name=name, exist_ok=True,   # fork tich hop torch-pruning; PHAI tat (giong train.py cua repo)
         )
         if a.lr0 is not None:
             train_kwargs["lr0"] = a.lr0
