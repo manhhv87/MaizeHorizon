@@ -44,7 +44,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--prefix", required=True, help="prefix written by exp_resolution_sweep (_pot.csv, _phys.csv)")
     ap.add_argument("--out", default=None)
-    ap.add_argument("--title", default="Detection is governed by physical sensor resolution, not network input size")
+    ap.add_argument("--title", default="Recall by native box height is flat above input 960; recall by input POT merely shifts")
     a = ap.parse_args()
     out = a.out or f"{a.prefix}_fig"
 
