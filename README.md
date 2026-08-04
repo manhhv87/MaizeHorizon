@@ -1,13 +1,13 @@
 # MaizeHorizon
 
-Far-field per-plant maize detection range saturates with network input size.
+Far-field per-plant maize detection: network input size does not lower the floor.
 
 Code and evaluation protocol for a study of how far ahead a ground robot can detect individual
 maize seedlings. A forward-facing camera driving down a crop row turns per-plant detection into a
 far-field small-object problem: a distant seedling spans a handful of pixels and blends into the
-soil. We show that detection range stops responding to the network input above a modest size, that
-resolved pixels stop predicting detectability at the floor itself, and that three intuitive
-forward-motion remedies all fail to recover the far tier.
+soil. Enlarging the network input is the standard reflex, and we show it does not lower the floor.
+We then rule out six candidate remedies, each against a control that would have exposed a real
+effect, and give the mechanism behind every failure.
 
 ## Key result
 
@@ -20,9 +20,10 @@ Evaluating one detector at input sizes 640 to 1920 separates cause from symptom:
 
 Across 24 paired comparisons among inputs 960, 1280 and 1920, every difference falls inside
 +/-0.073 recall and 12 favour the larger input against 12 the smaller, so there is no systematic
-gain. Half-recall sits near a 52 px native box height, but that height is not a sensor constant: it
-moves with plant-soil contrast (48 to 57 px), and matching plants on apparent size shows recall
-falling by up to 0.31 with viewing distance below 40 px native. Resolved pixels account for
+gain. Half-recall sits near a 52 px native box height at the deployed operating point (confidence 0.25),
+but that height is not a sensor constant: it moves with plant-soil contrast (48 to 57 px), drops to
+about 29 px at the recall ceiling, and matching plants on apparent size shows recall falling by up
+to 0.31 with viewing distance below 40 px native. Resolved pixels account for
 detectability on resolved plants and stop doing so at the floor.
 
 ## Dataset
@@ -31,7 +32,8 @@ MaizeHorizon is a forward-motion, range-stratified per-plant maize benchmark: 28
 frames at 1920x1080, and 3 held-out test clips hand-labelled with 4,067 plant and 941 ignore
 boxes, stratified near / mid / far by pixels-on-target.
 
-Download: [doi:10.5281/zenodo.21775699](https://doi.org/10.5281/zenodo.21775699) (CC BY 4.0).
+Download: [doi:10.5281/zenodo.21775698](https://doi.org/10.5281/zenodo.21775698) (CC BY 4.0).
+That DOI always resolves to the latest version; cite it rather than a version-specific one.
 Two archives, `MaizeHorizon-images.tar` and `MaizeHorizon-annotations.tar.gz`, both unpacking
 into a single `data/` directory.
 
@@ -109,6 +111,7 @@ Two things to know:
 | `exp_equivalence.py` | paired equivalence test across input sizes |
 | `exp_range_matched.py` | recall at matched apparent size, split by viewing distance |
 | `exp_cluster_ci.py` | intervals clustered by plant rather than by box |
+| `exp_ap_by_native.py` | AP in fixed native-height bins, comparable across input sizes |
 | `tbxrd_mint.py`, `train_tbxrd_stage2.py`, `mve_tbd.py` | the three forward-motion remedies |
 | `furrowmap_*.py` | count-when-near baseline |
 
@@ -116,8 +119,8 @@ Two things to know:
 
 ```bibtex
 @article{maizehorizon,
-  title  = {Far-Field Per-Plant Maize Detection Range Saturates with
-            Network Input Size},
+  title  = {Far-Field Per-Plant Maize Detection: Network Input Size
+            Does Not Lower the Floor},
   year   = {2026}
 }
 
@@ -126,8 +129,8 @@ Two things to know:
                detection dataset},
   year      = {2026},
   publisher = {Zenodo},
-  version   = {1.0.0},
-  doi       = {10.5281/zenodo.21775699}
+  version   = {1.0.1},
+  doi       = {10.5281/zenodo.21775698}
 }
 ```
 
