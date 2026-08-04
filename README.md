@@ -129,7 +129,6 @@ Two things to know:
                detection dataset},
   year      = {2026},
   publisher = {Zenodo},
-  version   = {1.0.1},
   doi       = {10.5281/zenodo.21775698}
 }
 ```
