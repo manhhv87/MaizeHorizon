@@ -11,6 +11,8 @@ Writes three files:
   <prefix>_phys.csv   recall vs physical height, one curve per imgsz (paired: same bins, same n)
   <prefix>_range.csv  h50, the physical height at 50% recall, per imgsz
   <prefix>_prec.csv   per-tier recall and ignore-aware precision, per imgsz
+  <prefix>_physprec.csv  recall and precision in the same fixed native bins, so a recall gain
+                      at one input size can be checked against what it costs in precision
 
 Eval-only keeps the model fixed and changes only the pixel budget. RUN_SCALING.md describes the
 train-matched variant.
@@ -72,11 +74,11 @@ def eval_one_imgsz(cps, items, imgsz, args):
     from ultralytics import YOLO
     npot = len(FINE_EDGES) - 1
     nphys = len(PHYS_EDGES) - 1
-    pot_rec, phys_rec, tier_rec, tier_prec = [], [], [], []
+    pot_rec, phys_rec, tier_rec, tier_prec, phys_prec = [], [], [], [], []
     pot_n = np.zeros(npot); phys_n = np.zeros(nphys); tier_n = {s: 0 for s in STRATA}
     for si, cp in enumerate(cps):
         model = YOLO(cp)
-        pdet = np.zeros(npot); pth = np.zeros(nphys)
+        pdet = np.zeros(npot); pth = np.zeros(nphys); pfp = np.zeros(nphys)
         tdet = {s: 0 for s in STRATA}
         tfp = {s: 0 for s in STRATA}
         for ip, w, h, gt, ig in items:
@@ -101,7 +103,9 @@ def eval_one_imgsz(cps, items, imgsz, args):
                 cx = (pred[j, 0] + pred[j, 2]) / 2; cy = (pred[j, 1] + pred[j, 3]) / 2
                 if in_any(cx, cy, ig):
                     continue
-                ph = (pred[j, 3] - pred[j, 1]) * scale
+                h_pred_native = pred[j, 3] - pred[j, 1]
+                pfp[bin_index(PHYS_EDGES, h_pred_native)] += 1
+                ph = h_pred_native * scale
                 ps = "near" if ph >= 32 else ("mid" if ph >= 16 else "far")
                 tfp[ps] += 1; tfp["all"] += 1
         # empty bin -> NaN, not 0.0; a fake 0.0 would distort the curve and h50
@@ -110,7 +114,13 @@ def eval_one_imgsz(cps, items, imgsz, args):
         tier_rec.append({s: (tdet[s] / tier_n[s] if tier_n[s] else float("nan")) for s in STRATA})
         tier_prec.append({s: (tdet[s] / (tdet[s] + tfp[s]) if (tdet[s] + tfp[s]) else float("nan"))
                           for s in STRATA})
-    return (np.array(pot_rec), pot_n, np.array(phys_rec), phys_n, tier_rec, tier_n, tier_prec)
+        # precision in the same fixed native bins as the recall curve, so the two are comparable
+        # across input sizes. A true positive is binned by its ground-truth height, a false
+        # positive by its own predicted height.
+        denom = pth + pfp
+        phys_prec.append(np.where(denom > 0, pth / np.maximum(denom, 1), np.nan))
+    return (np.array(pot_rec), pot_n, np.array(phys_rec), phys_n, tier_rec, tier_n, tier_prec,
+            np.array(phys_prec))
 
 
 def h50(edges, rec_mean):
@@ -177,11 +187,13 @@ def main():
     range_rows = [["imgsz", "h50_phys_px", "recall_near", "recall_mid", "recall_far", "n_seeds"]]
     prec_rows = [["imgsz", "tier", "n_gt", "recall_mean", "recall_std",
                   "prec_mean", "prec_std", "n_seeds"]]
+    physprec_rows = [["imgsz", "phys_lo_px", "phys_hi_px", "n_gt", "recall_mean", "recall_std",
+                      "prec_mean", "prec_std", "n_seeds"]]
 
     for imgsz in args.imgsz_list:
         print(f"\n=== imgsz {imgsz} ===")
         (pot_rec, pot_n, phys_rec, phys_n,
-         tier_rec, tier_n, tier_prec) = eval_one_imgsz(cps, items, imgsz, args)
+         tier_rec, tier_n, tier_prec, phys_prec) = eval_one_imgsz(cps, items, imgsz, args)
         pm = np.nanmean(pot_rec, axis=0); ps = np.array([sstd(pot_rec[:, b]) for b in range(pot_rec.shape[1])])
         hm = np.nanmean(phys_rec, axis=0); hs = np.array([sstd(phys_rec[:, b]) for b in range(phys_rec.shape[1])])
         for b in range(len(FINE_EDGES) - 1):
@@ -194,6 +206,11 @@ def main():
             hi_s = "inf" if not np.isfinite(hi) else f"{hi:.0f}"
             phys_rows.append([imgsz, f"{lo:.0f}", hi_s, int(phys_n[b]), round(float(hm[b]), 4),
                               round(float(hs[b]), 4), len(cps)])
+            qm = float(np.nanmean(phys_prec[:, b])) if np.any(np.isfinite(phys_prec[:, b])) else float("nan")
+            qs = sstd([x for x in phys_prec[:, b] if np.isfinite(x)])
+            physprec_rows.append([imgsz, f"{lo:.0f}", hi_s, int(phys_n[b]),
+                                  round(float(hm[b]), 4), round(float(hs[b]), 4),
+                                  round(qm, 4) if np.isfinite(qm) else "", round(qs, 4), len(cps)])
         tmean = {s: float(np.nanmean([tr[s] for tr in tier_rec])) for s in STRATA}
         pmean = {s: float(np.nanmean([tp[s] for tp in tier_prec])) for s in STRATA}
         h_50 = h50(PHYS_EDGES, hm)
@@ -209,7 +226,7 @@ def main():
               f"{tier_n['near']}/{tier_n['mid']}/{tier_n['far']}")
 
     for name, rows in [("pot", pot_rows), ("phys", phys_rows), ("range", range_rows),
-                       ("prec", prec_rows)]:
+                       ("prec", prec_rows), ("physprec", physprec_rows)]:
         p = f"{args.out_prefix}_{name}.csv"
         with open(p, "w", newline="", encoding="utf-8") as f:
             csv.writer(f).writerows(rows)
