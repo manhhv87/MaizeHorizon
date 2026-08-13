@@ -121,12 +121,14 @@ Two things to know:
 @article{maizehorizon,
   title  = {Far-Field Per-Plant Maize Detection: Network Input Size
             Does Not Lower the Floor},
+  author = {Hoang, Manh V.},
   year   = {2026}
 }
 
 @dataset{maizehorizon_data,
   title     = {MaizeHorizon: a forward-motion, range-stratified per-plant maize
                detection dataset},
+  author    = {Hoang, Manh V.},
   year      = {2026},
   publisher = {Zenodo},
   doi       = {10.5281/zenodo.21775698}

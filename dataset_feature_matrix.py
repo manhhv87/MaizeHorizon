@@ -1,114 +1,150 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Data for the dataset feature-conjunction table.
+"""Emit the dataset feature-conjunction table (tab:compare) of the paper.
 
-Competitor rows are curated from the cited releases and cannot be derived from code. The
-MaizeHorizon row is verified automatically against the actual data: ignore class present,
-far tier quantified, clip-disjoint splits, per-plant track ids.
+The columns are exactly the conjunction claimed in Related Works: per-plant maize
+annotation, a forward-to-horizon ground-robot viewpoint, a quantified far tier via
+a box-area CDF, an explicit ignore class, clip-disjoint splits, and a
+human-verified per-plant count ledger. One further column, multi-site, is carried
+so the table also shows where competitors lead MaizeHorizon.
 
-Writes the LaTeX table body, a CSV, and the verification result.
+Competitor cells are curated from the cited releases and cannot be derived from
+code, so each carries a note recording why it reads as it does. The MaizeHorizon
+row is verified against the real artifacts instead of asserted: tier counts and
+the ignore class come from the test labels through the same read_gt/stratum used
+by the evaluation protocol, clip-disjointness from the split lists, and the count
+ledger from results/counting.
 
-  python dataset_feature_matrix.py --mint-root data/mint --out-tex _feature_matrix.tex
+Verification only ever lowers a cell. A property that cannot be checked from data
+(the camera viewpoint) stays as design intent and says so.
+
+  python dataset_feature_matrix.py
+  python dataset_feature_matrix.py --out-tex paper/sections/_feature_matrix.tex
+
+Paste the emitted table over the one in paper/sections/materials_methods.tex; a
+clean diff is the evidence that the table is still what the data supports.
 """
-import argparse, os, glob, csv, sys
-import xml.etree.ElementTree as ET
+import argparse
+import csv
+import glob
+import json
+import os
+import sys
 
-# six boolean columns; the LaTeX header wraps with \\
-COLS = ["Per-plant maize", "Forward-to-horizon", "Quantified far tier",
-        "Ignore class", "Clip-disjoint splits", "Per-plant track IDs"]
+from eval_testset import read_gt, stratum
 
-# curated values for competitor datasets (1=yes, 0=no), taken from the cited releases
-# note: source for each row; MaizeHorizon is left None and verified below
+REPO = os.path.dirname(os.path.abspath(__file__))
+
+# Header text per column, wrapped over the two header lines of the LaTeX table.
+COLS = [("Per-plant", "maize"), ("Forward-", "to-horizon"), ("Quantified", "far tier"),
+        ("Ignore", "class"), ("Clip-disjoint", "splits"), ("Count", "ledger"),
+        ("Multi-", "site")]
+NAMES = [f"{a} {b}".replace("- ", "-") for a, b in COLS]
+
+# Curated from the cited releases (1=yes, 0=no). MaizeHorizon is None -> verified.
 ROWS = [
-    ("Veridis", "veridis2026", [1, 0, 0, 0, 0, 0],
-     "per-plant maize co; viewpoint under-represents far tier; khong CDF far, khong ignore/splits/track"),
-    ("CropFollow / Sivakumar et al.", "sivakumar2021cropfollow", [0, 1, 0, 0, 0, 0],
+    ("GWHD", "david2020gwhd", [0, 0, 0, 0, 0, 0, 1],
+     "lua mi khong phai ngo; nadir/oblique; nhieu site va quoc gia -> chi Multi-site la cmark"),
+    ("Veridis", "veridis2026", [1, 0, 0, 0, 0, 0, 0],
+     "per-plant maize co; viewpoint under-represents far tier; khong CDF far, khong ignore/splits/ledger"),
+    ("CropFollow / Sivakumar et al.", "sivakumar2021cropfollow", [0, 1, 0, 0, 0, 0, 0],
      "forward-facing ground robot (chia ego-motion) NHUNG la nav/row, KHONG per-plant box"),
-    ("CRDLD", "desilva2024croprow", [0, 0, 0, 0, 0, 0],
-     "crop-ROW detection (low density), khong per-plant; khong dat far-tier/ignore/splits/track"),
-    ("MSDD", "kharismawati2025msdd", [1, 0, 0, 0, 0, 0],
+    ("CRDLD", "desilva2024croprow", [0, 0, 0, 0, 0, 0, 0],
+     "crop-ROW detection (low density), khong per-plant; khong dat far-tier/ignore/splits/ledger"),
+    ("MSDD", "kharismawati2025msdd", [1, 0, 0, 0, 0, 0, 0],
      "per-plant seedling box NHUNG early-stage, near-nadir/short-range (khong to-horizon)"),
-    ("CornWeed", "iqbal2023cornweed", [1, 0, 0, 0, 0, 0],
-     "per-instance maize/weed; geometry khong forward-to-horizon; khong far-tier/ignore/splits/track"),
-    ("WeedMaize", "lopezcorrea2021weedmaize", [1, 0, 0, 0, 0, 0],
-     "per-instance maize/weed; tuong tu CornWeed; khong release track IDs"),
-    ("MaizeHorizon (ours)", None, None, "auto-verify tu data that"),
+    ("CornWeed", "iqbal2023cornweed", [1, 0, 0, 0, 0, 0, 0],
+     "per-instance maize/weed; geometry khong forward-to-horizon; khong far-tier/ignore/splits/ledger"),
+    ("WeedMaize", "lopezcorrea2021weedmaize", [1, 0, 0, 0, 0, 0, 0],
+     "per-instance maize/weed; tuong tu CornWeed; khong release count ledger"),
+    ("MaizeHorizon (ours)", None, None, "auto-verify tu artifact that"),
 ]
 
-
-def parse_cvat_boxes(xml_path):
-    """CVAT XML -> (boxes as (label, area_frac), W, H), or None."""
-    if not xml_path or not os.path.exists(xml_path):
-        return None
-    try:
-        root = ET.parse(xml_path).getroot()
-    except Exception as e:
-        print(f"[!] could not read {xml_path}: {e}")
-        return None
-    boxes = []
-    for img in root.iter("image"):
-        W = float(img.get("width", 0)) or 1920.0
-        H = float(img.get("height", 0)) or 1080.0
-        for b in img.iter("box"):
-            x1, y1 = float(b.get("xtl")), float(b.get("ytl"))
-            x2, y2 = float(b.get("xbr")), float(b.get("ybr"))
-            boxes.append((b.get("label", ""), abs((x2 - x1) * (y2 - y1)) / (W * H)))
-    return boxes
+CAPTION = (
+    "Feature-conjunction matrix over the \\emph{far-field-specific} axes this study requires: "
+    "MaizeHorizon vs.\\ representative agricultural datasets. \\cmark\\ = property "
+    "provided/quantified; \\xmark\\ = not reported in the cited release. ``Forward-to-horizon'' "
+    "denotes a forward-facing ground camera whose optical axis recedes along the row to the "
+    "horizon. The matrix covers only axes relevant to the sub-resolution floor; several datasets "
+    "lead MaizeHorizon on others (multi-site, e.g.\\ GWHD; multi-season; cross-domain splits; "
+    "dataset scale). The distinguishing property is the conjunction, not any single column. "
+    "Competitor cells are curated from the cited releases; the MaizeHorizon row is verified "
+    "against the released artifacts by \\texttt{dataset\\_feature\\_matrix.py}.")
 
 
 def clip_of(name):
-    b = os.path.basename(name)
-    return b.rsplit("_f", 1)[0] if "_f" in b else b
+    return os.path.basename(name).split("_f")[0]
 
 
 def verify_maizehorizon(a):
-    """Verify the six properties against the real data; unverifiable ones fall back to design intent."""
-    # all six hold by design; verification only lowers a value if the data contradicts it
-    v = [1, 1, 1, 1, 1, 1]
-    note = ["per-plant maize box (thiet ke)", "forward-to-horizon ground robot (thiet ke)",
-            "thiet ke", "thiet ke", "thiet ke", "thiet ke"]
-    boxes = parse_cvat_boxes(a.annotations)
-    if boxes is not None and boxes:
-        labels = {lb.lower() for lb, _ in boxes}
-        far = sum(1 for _, af in boxes if af < 0.001)
-        frac = 100.0 * far / len(boxes)
-        v[2] = 1; note[2] = f"XAC NHAN tu data: {frac:.1f}% box < 0.1% dien tich anh (n={len(boxes)})"
-        has_ig = any("ignore" in lb for lb in labels)
-        v[3] = 1 if has_ig else 0
-        note[3] = f"{'XAC NHAN co' if has_ig else 'CANH BAO: KHONG thay'} label ignore (labels={sorted(labels)})"
+    """Check the six claimed properties against real artifacts; multi-site stays 0."""
+    v = [1, 1, 1, 1, 1, 1, 0]
+    note = [""] * 7
+
+    labels = sorted(glob.glob(os.path.join(a.labels_dir, "*.txt")))
+    if labels:
+        tiers = {"near": 0, "mid": 0, "far": 0}
+        n_plant = n_ign = 0
+        scale = a.imgsz / float(max(a.width, a.height))
+        for lp in labels:
+            plants, ignores = read_gt(lp, a.width, a.height)
+            n_plant += len(plants)
+            n_ign += len(ignores)
+            for b in plants:
+                tiers[stratum(b, "pot", scale)] += 1
+        v[0] = 1 if n_plant else 0
+        note[0] = f"XAC NHAN: {n_plant} box per-plant trong {len(labels)} khung"
+        v[2] = 1 if all(tiers.values()) else 0
+        note[2] = (f"XAC NHAN tu nhan: near {tiers['near']} / mid {tiers['mid']} / "
+                   f"far {tiers['far']} (POT @ imgsz {a.imgsz:g})")
+        v[3] = 1 if n_ign else 0
+        note[3] = (f"XAC NHAN: {n_ign} box ignore (class 1)" if n_ign
+                   else "CANH BAO: khong thay box ignore nao")
     else:
-        note[2] = note[3] = f"thiet ke (chua verify: khong doc {a.annotations})"
-    # clip-disjoint: no clip may appear in two splits
-    sd = a.split_dir
-    if sd and os.path.isdir(sd):
-        split_clips = {}
-        for sp in ("train", "valid", "test"):
-            idir = os.path.join(sd, sp, "images")
-            cls = {clip_of(p) for e in ("*.jpg", "*.png", "*.jpeg") for p in glob.glob(os.path.join(idir, e))}
-            if cls:
-                split_clips[sp] = cls
+        note[0] = note[2] = note[3] = f"thiet ke (chua verify: khong co nhan o {a.labels_dir})"
+
+    # Not derivable from labels: the camera geometry is a property of the capture.
+    note[1] = "thiet ke: forward-facing ground robot, truc quang chay doc hang toi chan troi"
+
+    split_clips = {"test": {clip_of(p) for p in labels}} if labels else {}
+    for sp in ("train", "valid"):
+        f = os.path.join(a.arm_dir, f"{sp}.txt")
+        if os.path.exists(f):
+            cs = {clip_of(ln.strip()) for ln in open(f, encoding="utf-8") if ln.strip()}
+            if cs:
+                split_clips[sp] = cs
+    if len(split_clips) > 1:
         overlap = set()
-        sps = list(split_clips)
+        sps = sorted(split_clips)
         for i in range(len(sps)):
             for j in range(i + 1, len(sps)):
                 overlap |= split_clips[sps[i]] & split_clips[sps[j]]
-        if split_clips:
-            v[4] = 0 if overlap else 1
-            note[4] = f"{'XAC NHAN clip-disjoint' if not overlap else 'CANH BAO RO RI: '+str(overlap)} ({sd})"
-        else:
-            note[4] = f"thiet ke (split-dir {sd} rong)"
+        v[4] = 0 if overlap else 1
+        note[4] = ("XAC NHAN clip-disjoint: "
+                   + "; ".join(f"{s}={sorted(split_clips[s])}" for s in sps)) if not overlap \
+            else f"CANH BAO RO RI clip: {sorted(overlap)}"
     else:
-        note[4] = "thiet ke (chua verify: chua co split-dir; chay resplit_by_clip)"
-    # track ids come from data/mint/*/pairs.jsonl
-    npairs = 0
-    for pj in glob.glob(os.path.join(a.mint_root, "*", "pairs.jsonl")):
-        for ln in open(pj, encoding="utf-8"):
-            if '"track_id"' in ln:
-                npairs += 1
-    if npairs:
-        v[5] = 1; note[5] = f"XAC NHAN: {npairs} cap near/far co track_id ({a.mint_root}/*/pairs.jsonl)"
-    else:
-        note[5] = f"thiet ke (chua verify: chua co pairs.jsonl trong {a.mint_root}; chay mint)"
+        note[4] = f"thiet ke (chua verify: khong doc du split o {a.arm_dir})"
+
+    # Ledgers differ by the POT a plant must reach, and one clip has both a
+    # reach-16 and a reach-32 ledger. Summing across them would double-count that
+    # clip and produce a total that appears nowhere in the paper, so each file is
+    # reported on its own terms.
+    ledgers = sorted(glob.glob(a.ledger_glob))
+    per = []
+    for p in ledgers:
+        try:
+            d = json.load(open(p, encoding="utf-8"))
+        except Exception:
+            continue
+        n = int(d.get("n_plants") or len(d.get("plants") or []))
+        if n:
+            per.append(f"{os.path.basename(p)}: {n} cay (POT>={d.get('min_pot_reach')})")
+    v[5] = 1 if per else 0
+    note[5] = (f"XAC NHAN {len(per)} ledger -> " + "; ".join(per)) if per \
+        else f"thiet ke (chua verify: khong co ledger khop {a.ledger_glob})"
+
+    note[6] = "mot dia diem: xmark co y, de bang cho thay cho competitor dan truoc"
     return v, note
 
 
@@ -117,62 +153,56 @@ def cell(x):
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--annotations", default="../annotations.xml", help="CVAT XML used to verify the ignore class and far tier")
-    ap.add_argument("--split-dir", default="datasets/testset_split", help="verify clip-disjoint")
-    ap.add_argument("--mint-root", default="data/mint", help="verify per-plant track IDs (pairs.jsonl)")
-    ap.add_argument("--out-tex", default="_feature_matrix.tex")
-    ap.add_argument("--out-csv", default="_feature_matrix.csv")
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--labels-dir", default=os.path.join(REPO, "data", "test", "labels"))
+    ap.add_argument("--arm-dir", default=os.path.join(REPO, "data", "arms", "stock"),
+                    help="thu muc chua train.txt/valid.txt de kiem clip-disjoint")
+    ap.add_argument("--ledger-glob",
+                    default=os.path.join(REPO, "results", "counting", "ledger_IMG_*.json"))
+    ap.add_argument("--imgsz", type=float, default=1280.0)
+    ap.add_argument("--width", type=float, default=1920.0)
+    ap.add_argument("--height", type=float, default=1080.0)
+    ap.add_argument("--out-tex", default=os.path.join(REPO, "results", "_feature_matrix.tex"))
+    ap.add_argument("--out-csv", default=os.path.join(REPO, "results", "_feature_matrix.csv"))
     a = ap.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
 
-    rows = []
-    print("=== VERIFY hang MaizeHorizon (tu data that) ===")
+    rows, warned = [], False
+    print("=== VERIFY hang MaizeHorizon (tu artifact that) ===")
     for name, cite, bools, note in ROWS:
-        if bools is None:                                # MaizeHorizon -> auto
+        if bools is None:
             bools, vnotes = verify_maizehorizon(a)
-            for c, vn in zip(COLS, vnotes):
+            for c, vn in zip(NAMES, vnotes):
                 print(f"  [{c}] {vn}")
+                warned |= vn.startswith("CANH BAO")
         rows.append((name, cite, bools))
 
-    # --- LaTeX output ---
-    h1 = " & ".join(["Dataset"] + [c.split(" ")[0] + ("-" if "-" in c else "") for c in COLS])  # khong dung; ta tu viet header
-    lines = []
-    lines.append("\\begin{table*}[t]")
-    lines.append("\\centering")
-    lines.append("\\caption{Feature-conjunction matrix: MaizeHorizon vs.\\ representative agricultural datasets. "
-                 "\\cmark\\ = property provided/quantified in the released dataset, \\xmark\\ = not provided/reported. "
-                 "``Forward-to-horizon'' denotes a forward-facing ground camera whose optical axis recedes along the "
-                 "row to the horizon. No single prior dataset provides all six; MaizeHorizon is distinguished by their "
-                 "conjunction. Competitor cells are curated from the cited releases; the MaizeHorizon row is verified "
-                 "from the data by \\texttt{fork\\_train/dataset\\_feature\\_matrix.py}.}")
-    lines.append("\\label{tab:compare}")
-    lines.append("\\fitw{%")
-    lines.append("\\begin{tabular}{l" + "c" * len(COLS) + "}")
-    lines.append("\\toprule")
-    lines.append("Dataset & Per-plant & Forward- & Quantified & Ignore & Clip-disjoint & Per-plant \\\\")
-    lines.append("        & maize & to-horizon & far tier & class & splits & track IDs \\\\")
-    lines.append("\\midrule")
+    lines = ["\\begin{table*}[!ht]", "\\centering", "\\caption{" + CAPTION + "}",
+             "\\label{tab:compare}", "\\fitw{%",
+             "\\begin{tabular}{l" + "c" * len(COLS) + "}", "\\toprule",
+             "Dataset & " + " & ".join(c[0] for c in COLS) + " \\\\",
+             "        & " + " & ".join(c[1] for c in COLS) + " \\\\", "\\midrule"]
     for name, cite, bools in rows:
         nm = ("\\textbf{" + name + "}") if "ours" in name else name
         if cite:
             nm += "~\\cite{" + cite + "}"
         lines.append(nm + " & " + " & ".join(cell(b) for b in bools) + " \\\\")
-    lines.append("\\bottomrule")
-    lines.append("\\end{tabular}}")
-    lines.append("\\end{table*}")
+    lines += ["\\bottomrule", "\\end{tabular}}", "\\end{table*}"]
     tex = "\n".join(lines) + "\n"
+
+    os.makedirs(os.path.dirname(a.out_tex), exist_ok=True)
     open(a.out_tex, "w", encoding="utf-8").write(tex)
-
     with open(a.out_csv, "w", newline="", encoding="utf-8") as f:
-        w = csv.writer(f); w.writerow(["dataset"] + COLS)
-        for name, cite, bools in rows:
-            w.writerow([name] + ["yes" if b else "no" for b in bools])
+        w = csv.writer(f)
+        w.writerow(["dataset", "cite"] + NAMES + ["source"])
+        for (name, cite, bools), src in zip(rows, [r[3] for r in ROWS]):
+            w.writerow([name, cite or ""] + ["yes" if b else "no" for b in bools] + [src])
 
-    print(f"\n-> LaTeX: {a.out_tex}  (paste into main.tex)")
+    print(f"\n-> LaTeX: {a.out_tex}")
     print(f"-> CSV  : {a.out_csv}")
-    print("\n--- LaTeX preview ---\n" + tex)
+    print("\n--- LaTeX ---\n" + tex)
+    return 1 if warned else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
