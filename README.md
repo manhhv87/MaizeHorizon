@@ -2,118 +2,75 @@
 
 Far-field per-plant maize detection: network input size does not lower the floor.
 
-Code and evaluation protocol for a study of how far ahead a ground robot can detect individual
-maize seedlings. A forward-facing camera driving down a crop row turns per-plant detection into a
-far-field small-object problem: a distant seedling spans a handful of pixels and blends into the
-soil. Enlarging the network input is the standard reflex, and we show it does not lower the floor.
-We then rule out six candidate remedies, each against a control that would have exposed a real
-effect, and give the mechanism behind every failure.
+A forward-facing camera driving down a crop row turns per-plant detection into a
+far-field small-object problem — a distant seedling spans a handful of pixels and
+blends into the soil. Enlarging the network input is the standard reflex; this
+study shows it does not lower the floor, then rules out six candidate remedies,
+each against a control that would have exposed a real effect.
 
 ## Key result
 
-Evaluating one detector at input sizes 640 to 1920 separates cause from symptom:
+Stratifying recall by **input pixels-on-target** makes the curves shift with input
+size; stratifying by **native box height** makes them equivalent across inputs
+≥ 960, within ±0.073 recall. Across 24 paired comparisons among inputs 960, 1280
+and 1920, every difference falls inside that band and 12 favour the larger input
+against 12 the smaller — no systematic gain.
 
-| Stratify recall by | Behaviour |
-|---|---|
-| input pixels-on-target (POT) | curves shift with input size |
-| native box height | equivalent across inputs >= 960, within +/-0.073 recall |
-
-Across 24 paired comparisons among inputs 960, 1280 and 1920, every difference falls inside
-+/-0.073 recall and 12 favour the larger input against 12 the smaller, so there is no systematic
-gain. Half-recall sits near a 52 px native box height at the deployed operating point (confidence 0.25),
-but that height is not a sensor constant: it moves with plant-soil contrast (48 to 57 px), drops to
-about 29 px at the recall ceiling, and matching plants on apparent size shows recall falling by up
-to 0.31 with viewing distance below 40 px native. Resolved pixels account for
-detectability on resolved plants and stop doing so at the floor.
+Half-recall sits near a 52 px native box height at the deployed operating point
+(confidence 0.25), but that height is not a sensor constant: it moves with
+plant–soil contrast (48–57 px) and drops to about 29 px at the recall ceiling.
 
 ## Dataset
 
-MaizeHorizon is a forward-motion, range-stratified per-plant maize benchmark: 28 clips, 5,979
-frames at 1920x1080, and 3 held-out test clips hand-labelled with 4,067 plant and 941 ignore
-boxes, stratified near / mid / far by pixels-on-target.
+A forward-motion, range-stratified per-plant maize benchmark: 28 clips, 5,979
+frames at 1920×1080, with 3 held-out test clips hand-labelled with 4,067 plant and
+941 ignore boxes, stratified near/mid/far by pixels-on-target.
 
-Download: [doi:10.5281/zenodo.21775698](https://doi.org/10.5281/zenodo.21775698) (CC BY 4.0).
-That DOI always resolves to the latest version; cite it rather than a version-specific one.
-Two archives, `MaizeHorizon-images.tar` and `MaizeHorizon-annotations.tar.gz`, both unpacking
-into a single `data/` directory.
+Download: [doi:10.5281/zenodo.21775698](https://doi.org/10.5281/zenodo.21775698)
+(CC BY 4.0). Cite that concept DOI rather than a version-specific one. Both
+archives unpack into a single `data/` directory.
 
 ## Install
 
 ```bash
-git lfs install                      # the checkpoints are stored via Git LFS
+git lfs install                  # the checkpoints are stored via Git LFS
 git clone https://github.com/manhhv87/MaizeHorizon.git
 cd MaizeHorizon
-pip install -r requirements.txt      # ultralytics 8.3.160 + torch
+pip install -r requirements.txt  # ultralytics 8.3.160 + torch
 
-# fetch the dataset from Zenodo and unpack it into ./data
 tar -xf  MaizeHorizon-images.tar
 tar -xzf MaizeHorizon-annotations.tar.gz
 ```
 
-The 36 trained checkpoints (12 arms x 3 seeds, 916 MB) are in `runs/` via Git LFS, so every
-number in `results/` can be checked without retraining. `git clone` without Git LFS installed
-gives you the code and result tables but leaves the weights as pointer files.
-
-## Layout
-
-```
-data/
-├── images/<clip>/*.jpg      5,979 frames, the only copy
-├── test/{images,labels}     120 frames and their hand labels
-├── arms/{stock,nearfar}/    per-arm labels, train.txt, valid.txt, data.yaml
-└── mint/<clip>/             minted labels and pairs.jsonl (10,355 near/far pairs)
-results/                     every number in the paper, as CSV
-runs/<tag>_s<seed>/          best.pt (Git LFS), args.yaml, results.csv
-```
-
-Each arm's `images/` is a symlink to `data/images`, so no image bytes are duplicated. Ultralytics
-derives label paths by replacing the last `/images/` with `/labels/`, so the arms can share one
-image copy while keeping separate label trees.
+The 36 trained checkpoints (12 arms × 3 seeds, 916 MB) sit in `runs/` via Git LFS,
+so every number in `results/` can be checked without retraining. Cloning without
+Git LFS leaves the weights as pointer files.
 
 ## Reproducing
 
-```bash
-LAB=data/test/labels
-IMG=data/test/images
-```
+`python rerun_after_relabel.py` regenerates every table in `results/` and holds
+the exact arguments for each step. Training entry points are `train.py` (stock and
+nearfar arms), `train_tbxrd_stage2.py` (distillation), `train_nwd.py`, and
+`exp_multiarch_train.py`.
 
-`python rerun_after_relabel.py` regenerates everything below and holds the exact arguments.
+Two things to know: `max_det` differs by script (300 for recall and precision
+tables, 1000 for AP and the resolution sweep), and every CSV with an `n_gt` column
+should show 4,067 = 2,747 near / 1,238 mid / 82 far.
 
-| Result | Command |
+## Layout
+
+| Path | Role |
 |---|---|
-| Per-tier AP | `eval_ap.py --labels-dir "$LAB" --images-dir "$IMG" --runs runs --tags stock nearfar distill distill_shuffle --seeds 0 1 2 --iou 0.3 --imgsz 1280 --out results/detection/testset_ap03.csv` |
-| Recall ceiling | `eval_testset.py ... --iou 0.3 --conf 0.001 --out results/detection/testset_ceiling.csv` |
-| Resolution sweep | `exp_resolution_sweep.py ... --tag nearfar --imgsz-list 640 960 1280 1920 --conf 0.25 --out-prefix results/scaling/scaling` |
-| Cross-architecture | `exp_multiarch_eval.py ... --tags stock yolo11s yolov10s rtdetr-l --out results/baselines/rebuttal_multiarch.csv` |
-| Sliced inference | `exp_sahi_baseline.py ... --tile 640 --overlap 0.2 --imgsz 1280 --out results/baselines/sahi_ap.csv` |
-| Contrast terciles | `exp_contrast.py ... --out results/baselines/rebuttal_contrast` |
-| Burst super-resolution | `exp_burst_sr.py --frames-dir data/images/IMG_3916_test --gt-dir "$LAB" --out results/baselines/rebuttal_burst_sr.csv` |
-| Count-when-near | `furrowmap_ledger.py` then `furrowmap_count.py` |
-| Figures | `plot_cliff.py`, `plot_scaling.py`, `make_paper_figures.py`, `make_teaser.py` |
+| `data/` | frames, test labels, per-arm label sets, minted labels — not in the repository; created by unpacking the Zenodo archives |
+| `results/` | every reported number, as CSV |
+| `runs/<tag>_s<seed>/` | `weights/best.pt` (Git LFS), `args.yaml`, `results.csv` |
+| `eval_testset.py`, `eval_ap.py`, `rebuttal_common.py` | the evaluation protocol |
+| `exp_*.py` | resolution sweep, equivalence, contrast, range-matched, clustered CIs |
+| `train*.py`, `tbxrd_mint.py` | training and the forward-motion remedies |
+| `plot_*.py`, `make_paper_figures.py` | figures |
 
-Training: `train.py` (SGD, lr0 0.01, batch 8, 200 epochs, imgsz 1280) for `stock` and `nearfar`;
-`train_tbxrd_stage2.py` for the distillation arms; `train_nwd.py` for NWD;
-`exp_multiarch_train.py` for the other architectures; `tbxrd_mint.py` produces the minted labels.
-
-Two things to know:
-
-- `max_det` differs by script: 300 for the recall and precision tables, 1000 for AP and the
-  resolution sweep. At conf 0.001 the cap binds, because it applies to both classes combined.
-- Every CSV with an `n_gt` column should show 4,067 = 2,747 near / 1,238 mid / 82 far.
-
-## Code
-
-| | |
-|---|---|
-| `eval_testset.py`, `eval_ap.py` | evaluation protocol: POT-stratified, ignore-aware, one-to-one greedy IoU |
-| `rebuttal_common.py` | shared loader and helpers; other scripts import the protocol rather than reimplementing it |
-| `exp_resolution_sweep.py` | recall against native height vs against input POT |
-| `exp_equivalence.py` | paired equivalence test across input sizes |
-| `exp_range_matched.py` | recall at matched apparent size, split by viewing distance |
-| `exp_cluster_ci.py` | intervals clustered by plant rather than by box |
-| `exp_ap_by_native.py` | AP in fixed native-height bins, comparable across input sizes |
-| `tbxrd_mint.py`, `train_tbxrd_stage2.py`, `mve_tbd.py` | the three forward-motion remedies |
-| `furrowmap_*.py` | count-when-near baseline |
+Each arm's `images/` is a symlink to `data/images`, so no image bytes are
+duplicated.
 
 ## Citation
 
@@ -137,5 +94,6 @@ Two things to know:
 
 ## License
 
-Code is AGPL-3.0, inherited from [Ultralytics YOLO](https://github.com/ultralytics/ultralytics),
-which this work builds on. The dataset is CC BY 4.0.
+Code is AGPL-3.0, inherited from
+[Ultralytics YOLO](https://github.com/ultralytics/ultralytics). The dataset is
+CC BY 4.0.
