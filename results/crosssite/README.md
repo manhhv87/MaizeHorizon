@@ -1,0 +1,320 @@
+# Cross-site: Đan Phượng (Hà Nội) → Nam Sách (Hải Phòng)
+
+Kiểm chứng trên **địa điểm và cảm biến độc lập**, chạy 2026-08-16 sau khi
+Biosystems Engineering desk-reject (Ms. YBENG-D-26-01644) với lý do nêu trong
+editorial của chính ban biên tập:
+
+> *"Research that is not validated on independent data is a proof of concept.
+> It is not engineering... Singular datasets, even with some form of
+> cross-validation, are rarely considered to provide proof of generalisation."*
+> — Demeyer et al., Biosystems Engineering 269 (2026) 104524
+
+## Hai bộ dữ liệu
+
+| | Đan Phượng (bài hiện tại) | Hải Phòng (mới) |
+|---|---|---|
+| **Địa điểm** | Đan Phượng, Hà Nội | **Nam Sách, Hải Phòng** (~70 km về phía đông) |
+| **Thời gian quay** | **4/2025** | **7/2026** |
+| Khung tách | 2026-06-28 | — |
+| Cảm biến | Logitech C920, 1920×1080 | Samsung S23, 7680×4320 (8K) |
+| Khung có nhãn | 120 | 150 (2 phiên) |
+| Box plant | 4.067 | 29.297 |
+| Box ignore | 941 | 6.482 |
+| Tầng far @1280 | 82 | 5.790 |
+| Dưới 12px POT | **4** | **2.324** |
+
+⚠️ **Bản thảo hiện KHÔNG nêu năm quay ở bất kỳ đâu** — chỉ "over three days at
+several times of day". Hướng dẫn Vallejo đòi mô tả dữ liệu phải có "environmental/
+contextual conditions", mà với dữ liệu nông nghiệp thì thời điểm là cốt lõi. Phải bổ sung.
+
+Với hai năm + hai tỉnh + hai cảm biến, bộ dữ liệu đáp ứng **cả hai vế** của tiêu chí
+Demeyer (*"multiple years **and/or** multiple sites"*), không còn phải dựa vào chữ *or*.
+
+Nhãn Hải Phòng do **người gán**, cùng lược đồ lớp (`0: plant`, `1: ignore`) và
+cùng giao thức ignore. Nguồn: `/media/manhhv/DATA/AI/_archive/paper2/test2/`.
+
+## Lệnh đã chạy
+
+```bash
+LAB2=/media/manhhv/DATA/AI/_archive/paper2/test2/labels
+IMG2=/media/manhhv/DATA/AI/_archive/paper2/test2/images
+
+# E1 — chuyển vùng zero-shot, 8K gốc
+"$PY" eval_testset.py --labels-dir "$LAB2" --images-dir "$IMG2" \
+  --runs runs --tags stock --seeds 0 1 2 --iou 0.3 --conf 0.001 \
+  --imgsz 1280 --max-det 3000 --device 0 \
+  --out results/crosssite/namsach_ceiling.csv
+
+# Đối chứng cảm biến — cùng cảnh, hạ mẫu 8K -> 1920x1080 (LANCZOS), rồi eval y hệt
+#   script hạ mẫu: xem mục "Tái lập" bên dưới
+"$PY" eval_testset.py --labels-dir <hd_1080>/labels --images-dir <hd_1080>/images \
+  --runs runs --tags stock --seeds 0 1 2 --iou 0.3 --conf 0.001 \
+  --imgsz 1280 --max-det 3000 --device 0 \
+  --out results/crosssite/namsach_ds1080_ceiling.csv
+```
+
+⚠️ `--max-det 3000`, **không** phải 300 hay 1000. Hải Phòng có ~238 box/khung so
+với ~34 của bộ cũ; trần mặc định cắt cụt nghiêm trọng. Đây là biến thể của bẫy `max_det`
+đã biết của repo.
+
+## Kết quả — recall theo tầng (conf=0.001, IoU 0.3, imgsz 1280, 3 seed)
+
+| Tầng | Đan Phượng | Hải Phòng 8K | n_gt (HD) |
+|---|---|---|---|
+| near | 0.981 | 0.916 ± 0.034 | 11.775 |
+| mid | 0.771 | 0.678 ± 0.084 | 11.732 |
+| far | 0.337 | 0.183 ± 0.095 | 5.790 |
+
+## Kết quả — đường cong recall theo POT
+
+| POT | Đan Phượng 1080p | Hải Phòng 8K | HD hạ mẫu 1080p |
+|---|---|---|---|
+| 6 | — | 0.017 (n=231) | 0.009 |
+| 10 | 0.000 (n=4) | 0.088 (n=2.092) | 0.043 |
+| 14 | 0.355 (n=78) | 0.251 (n=3.466) | 0.154 |
+| 18 | 0.476 (n=164) | 0.475 (n=3.546) | 0.367 |
+| 22 | 0.618 (n=303) | 0.683 (n=3.204) | 0.592 |
+| 28 | 0.894 (n=771) | 0.819 (n=4.982) | 0.757 |
+| 56 | 0.990 (n=661) | 0.934 (n=2.837) | 0.927 |
+
+**h50 (POT @imgsz 1280, conf=0.001): 18.7 · 18.5 · 20.4**
+
+## Ba kết luận
+
+**1. Định luật tái lập qua hai tỉnh và hai cảm biến.** h50 lệch 18.7 vs 18.5 —
+1%. Tại vùng chuyển tiếp (POT 18) hai đường trùng: 0.476 vs 0.475.
+
+**2. Khẳng định sub-12px giờ có sức mạnh thống kê.** Ô 8–12 POT: từ n=4
+(recall 0.000, vô nghĩa) lên n=2.092 (recall 0.088). Ô 4–8: n=231, recall 0.017.
+Phát biểu đúng không phải "về 0" mà là "~9% rồi ~2%".
+
+**3. Hiệu ứng độ phân giải cảm biến là thật nhưng nhỏ, và chỉ ở tầng nhỏ.**
+Cùng cảnh, cùng cây, cùng ánh sáng, chỉ khác độ phân giải: +0.046 (8–12 POT),
++0.097 (12–16), +0.108 (16–20), +0.022 (32–48), −0.007 (64–96). h50 dịch
+18.5 → 20.4, tức **10%**, dù số pixel danh nghĩa gấp **4 lần**.
+
+## Cảnh báo diễn giải — đọc trước khi trích số
+
+**a) `h50` khớp 18.7 vs 18.5 một phần là trùng hợp.** Tách ra thì:
+ruộng Hải Phòng **khó hơn ~9%** ở cùng độ phân giải (20.4 vs 18.7), rồi cảm biến
+8K **bù lại ~10%** (20.4 → 18.5). Hai hiệu ứng ngược chiều xấp xỉ triệt tiêu.
+Viết vào bài phải viết như vậy — tách được hai hiệu ứng có giá trị hơn con số
+trùng khớp.
+
+**b) Phải so cùng `conf`.** `h50 ≈ 52px native` trong bài đo ở `conf=0.25`
+(≈ 34.7 POT @1280). Mọi số ở đây đo ở `conf=0.001`. So chéo hai ngưỡng sinh ra
+một "hiệu ứng địa điểm ~70%" hoàn toàn giả — đã mắc lỗi này một lần khi phân tích.
+
+**c) 8K của điện thoại phần lớn là phóng đại rỗng.** Phổ công suất theo bán kính
+(crop 1024², 8 khung mỗi bộ): tại 0.75 Nyquist, S23 8K giữ tỷ lệ công suất
+**0.0025**, C920 1080p giữ **0.0345** — gấp 14 lần. Đây là lý do 4× pixel chỉ
+mua được 10% h50, và là **trụ cột lập luận**, không phải phần trang trí: thiếu
+nó, dữ liệu mới trông như đang phản bác luận điểm của bài.
+
+**d) Chiều cao box native không so sánh được giữa hai cảm biến.** 24px trên
+1080p và 24px trên 8K là hai góc nhìn khác nhau. Chỉ POT (và góc nhìn, nếu biết
+`f/p`) mới so được. `f/p` của S23 khi quay 8K **chưa đo** — FOV lúc quay 8K hẹp
+hơn lúc chụp ảnh, không tra được từ thông số.
+
+## Tái lập
+
+Script hạ mẫu (`PIL.Image.LANCZOS`, quality 92, nhãn chuẩn hoá nên giữ nguyên):
+xem `scripts/downsample_hd.py`. Đây là **ablation cảm biến**, không phải suy
+giảm tổng hợp thay cho ảnh xa thật — ảnh 8K là thật, việc hạ mẫu chỉ để tách
+biến độ phân giải khỏi biến địa điểm. Phải khai rõ như vậy trong bài.
+
+---
+
+# E2 — Quét input size trên khung 8K
+
+```bash
+"$PY" exp_resolution_sweep.py --labels-dir "$LAB2" --images-dir "$IMG2" \
+  --runs runs --tag stock --seeds 0 1 2 --imgsz-list 1280 1920 2560 3840 \
+  --iou 0.3 --conf 0.001 --max-det 3000 --device 0 \
+  --out-prefix results/crosssite/hd_sweep
+```
+
+⚠️ **Chỉ đọc `hd_sweep_pot.csv`.** Hai cột khác không dùng được cho bộ này:
+- `hd_sweep_phys.csv` / cột `h50_phys_px`: `PHYS_EDGES` hiệu chuẩn cho ảnh 1920,
+  trên 8K mọi box dồn vào bin trên cùng (nguồn cảnh báo `Mean of empty slice`).
+  Tính lại h50 từ đường cong POT, chỉ dùng bin có `n_gt >= 100`.
+- `recall_near/mid/far` trong `_range.csv`: **bẫy đã biết của repo** — tầng
+  định nghĩa theo POT mà POT phụ thuộc imgsz, nên mỗi imgsz đo trên quần thể cây
+  khác nhau. Tầng far ở imgsz 3840 chỉ có **12 cây**.
+
+## Recall tại cùng chiều cao native (cách trình bày đúng)
+
+Cùng một cây, cùng một ảnh 8K, chỉ đổi input size:
+
+| h native | 1280 | 1920 | 2560 | 3840 | lãi |
+|---|---|---|---|---|---|
+| 60px | 0.088 | 0.324 | 0.467 | 0.496 | +0.408 |
+| 80px | 0.224 | 0.475 | 0.601 | 0.658 | +0.434 |
+| 100px | 0.400 | 0.629 | 0.719 | 0.766 | +0.366 |
+| 120px | 0.579 | 0.753 | 0.833 | 0.843 | +0.264 |
+| 160px | 0.789 | 0.885 | 0.907 | 0.903 | +0.114 |
+| 300px | 0.924 | 0.922 | — | — | ~0 |
+
+**h50 (px native trên cảm biến 8K):** 110.9 · 83.6 · 65.2 · 60.5 → cải thiện
+**1.83×** từ imgsz 1280 lên 3840, và **bão hoà**: bước 2560→3840 chỉ được 7%.
+
+## Kết luận — định luật thống nhất
+
+Ràng buộc là **`min(độ phân giải hữu hiệu của cảm biến, input size của mạng)`**.
+
+| Giàn máy | Danh nghĩa | Bão hoà tại | Độ phân giải hữu hiệu |
+|---|---|---|---|
+| C920, Đan Phượng | 1920 | imgsz ~960 | ≲ 960–1280 |
+| S23 8K, Hải Phòng | 7680 | imgsz ~2560–3840 | ~2560–3840 |
+
+Bài hiện tại đo trúng vế **cảm biến chặn**; dữ liệu mới lộ vế **mạng chặn**.
+Cả hai là một định luật. Điểm bão hoà của h50 chính là **phép đo độ phân giải
+hữu hiệu** của hệ ảnh — độc lập với, và trùng kết luận với, phép đo phổ công suất.
+
+⚠️ **Tiêu đề bài hiện tại sai trong trường hợp tổng quát.** *"Network Input Size
+Does Not Lower the Floor"* chỉ đúng khi cảm biến đã cạn thông tin. C1 phải viết
+lại thành dạng `min(...)`.
+
+## Việc tiếp theo (đã làm, xem các mục bên dưới)
+
+- **E4 — SAHI trên 8K.** Bài báo cáo tiling *làm giảm* far AP trên 1080p
+  (0.020 → 0.003) vì cảm biến không ghi được pixel nào để khôi phục. Trên 8K
+  pixel có thật, nên tiling đáng lẽ phải thắng. Đây là dự đoán kiểm chứng được.
+  ✅ **Đã chạy — dấu bị lật đúng như dự đoán.**
+- **E3 — kiểm `d_max` xuyên cảm biến.** Cần `f/p` của S23 ở chế độ quay 8K; phải
+  đo thực địa (thước dài đã biết ở khoảng cách đã biết), không tra được từ
+  thông số vì FOV chế độ 8K hẹp hơn chế độ ảnh.
+
+---
+
+# E3 — Hiệu chuẩn hình học và tầm làm việc xuyên cảm biến
+
+## `f/p` của Samsung S23 ở chế độ quay 8K
+
+Thông số Samsung: **80°** ở chế độ 8K. Đọc là **góc chéo** thì
+`f/p = (√(7680²+4320²)/2)/tan(40°) = 5251 px`, cho FOV ngang 72.4° và dọc 44.7°.
+
+Kiểm tra độc lập: FOV ngang 72.4° trên khung 16:9 quy về máy phim 35mm là tiêu cự
+**24.6 mm** — khớp thông số "24 mm equivalent" Samsung công bố. Vậy 80° là góc chéo,
+không phải góc ngang.
+
+## Hiệu chuẩn từ dữ liệu — quan hệ đường chân trời
+
+Với vật **thẳng đứng** đứng trên mặt phẳng, quan hệ sau là **chính xác** và
+**không phụ thuộc `f/p` lẫn góc nghiêng**:
+
+    h = (P / H_cam) · (y_base − y_horizon)
+
+Hồi quy trung vị theo dải `y_base` (24 dải, mỗi dải ≥80 box, R² = **0.985**):
+
+    h = 0.1499 · (y_base − 222)
+
+→ **chân trời ở hàng y = 222**, **chiều cao cây trung vi P = 0.097 m**.
+
+Đây là lý do phải dùng quan hệ này thay vì fit trực tiếp `(f/p, θ, P)`: bản fit
+trực tiếp chạy tới biên vì nó bỏ qua **độ lệch ngang** — ở FOV 72° một cây ở mép
+khung xa hơn cây giữa khung 1.24 lần dù cùng hàng ảnh.
+
+## ⚠️ Góc nghiêng ghi chép sai
+
+Ghi chép hiện trường nói *nghiêng 55° so với trục thẳng đứng* (= 35° dưới phương
+ngang). Dữ liệu **bác bỏ** con số đó:
+
+| Góc nghiêng giả định | `f/p` suy ra | FOV ngang |
+|---|---|---|
+| 35° dưới ngang (ghi chép) | 2768 | **108°** — bất khả, ống siêu rộng không quay 8K |
+| **20.3° dưới ngang** | **5251** | **72.4°** ✅ khớp thông số |
+| 23.0° dưới ngang | 4576 | 80.0° |
+
+Nghiêng ~20° cũng khớp giàn Đan Phượng (9–22°, trung vị 15°). **Dùng 20.3°.**
+
+## Kiểm chứng: khoảng cách thực của cây đã gán nhãn
+
+Với `f/p=5251`, nghiêng 20.3°, `H_cam=0.65 m`: cây đã gán nhãn nằm ở
+**1.0 – 8.0 m** (p5–p95), trung vị 3.2 m. Bài báo cáo Đan Phượng 1.1 – 13.8 m.
+Ngắn hơn vì cây nhỏ hơn (0.097 m so với ~0.15 m). Hình học nhất quán.
+
+## Ngưỡng phát hiện là ngưỡng GÓC
+
+`d_max = (f/p) · P / h50_native`, cùng `conf=0.001`, imgsz 1280:
+
+| | h50 native | ngưỡng góc | P dùng | d_max |
+|---|---|---|---|---|
+| Đan Phượng, C920 | 28.1 px | **1.182°** | 0.15 m ⚠️ | 7.27 m |
+| Hải Phòng, S23 8K | 111.0 px | **1.211°** | 0.097 m (fit) | 4.59 m |
+
+⚠️ `P = 0.15 m` cho Đan Phượng là **giả định**, lấy trung điểm dải 0.11–0.19 m mà
+bài báo cáo cho các phiên test. `d_max` tỉ lệ tuyến tính với `P`, nên con số 7.27 m
+mang nguyên sai số đó (±27% nếu P đi hết dải). Ngưỡng **góc** thì không phụ thuộc
+`P` — đó là lý do nên so ngưỡng góc chứ đừng so `d_max` giữa hai địa điểm.
+
+Chênh **2.4%** dù hai cảm biến khác nhau 3.86× về độ phân giải góc. Lý do: hai máy
+có FOV gần bằng nhau (70.4° và 72.4°) và cùng chạy imgsz 1280, nên **độ phân giải
+góc của đầu vào mạng** như nhau — mạng chặn ở cả hai, cảm biến không đóng vai trò.
+
+⚠️ Đây là **phép thử yếu** cho công thức `d_max`: hai giàn tình cờ bị chặn bởi cùng
+một thứ, nên việc hai ngưỡng góc khớp nhau chỉ xác nhận **dạng** của mô hình (ngưỡng
+là góc, không phải số pixel tuyệt đối). Nó không kiểm `d_max` độc lập được, vì
+`d_max` suy ra *từ* `h50` — nói "tại `d_max` thì recall = 0.5" là đúng theo định
+nghĩa. Phép thử thật (**E5**): tính khoảng cách mét của từng cây từ hình học đã hiệu
+chuẩn, đo recall theo khoảng cách, xem chỗ cắt 50% có rơi đúng chỗ công thức dự đoán.
+
+## Tầm làm việc theo input size (Hải Phòng)
+
+| imgsz | ngưỡng góc | d_max |
+|---|---|---|
+| 1280 | 1.211° | 4.59 m |
+| 1920 | 0.912° | 6.09 m |
+| 2560 | 0.710° | **7.82 m** |
+| 3840 | 0.659° | 8.43 m |
+
+Cùng đoạn phim, không đổi camera, không train lại: **1280 → 3840 kéo tầm từ 4.6 m
+lên 8.4 m (1.84×)**, bão hoà sau 2560. Bước 2560→3840 tốn gấp 2.25× tính toán để
+đổi 8% tầm ⇒ **imgsz 2560 là điểm ngọt** trên giàn này.
+
+---
+
+# E4 — SAHI tiling trên 8K: dấu bị lật
+
+```bash
+"$PY" exp_sahi_baseline.py --labels-dir "$LAB2" --images-dir "$IMG2" \
+  --runs runs --tag stock --seeds 0 1 2 --tile 1280 --imgsz 1280 --overlap 0.2 \
+  --iou 0.3 --conf 0.001 --max-det 3000 --device 0 \
+  --out results/crosssite/hd_sahi.csv
+```
+
+`tile 1280` + `imgsz 1280` = mỗi tile chạy ở **tỉ lệ 1:1 cảm biến**, tức gấp 6 lần
+độ phân giải hữu dụng so với full-frame @1280 trên ảnh 7680. Chạy ~28 tile/ảnh,
+nghẽn CPU (giải nén 8K), mất ~35 phút.
+
+| Tầng | full-frame @1280 | SAHI | Δ |
+|---|---|---|---|
+| near (n=11,775) | 0.7623 | 0.6037 | −0.1586 |
+| mid (n=11,732) | 0.4088 | 0.3432 | −0.0656 |
+| **far (n=5,790)** | 0.0157 | **0.0382** | **+0.0225** |
+| all | 0.5564 | 0.5328 | −0.0236 |
+
+## Dấu bị lật so với 1080p
+
+| | far AP, 1080p (bài) | far AP, 8K |
+|---|---|---|
+| full-frame | 0.020 | 0.0157 |
+| SAHI | **0.003** (−85%) | **0.0382** (+143%) |
+
+Tiling chỉ phóng to pixel. Cảm biến chưa ghi được → phóng to vô ích và có hại
+(1080p). Cảm biến đã ghi → tiling bóc ra dùng được (8K). Đây là **chân thứ ba**
+độc lập cho quy tắc `min(...)`, bên cạnh phổ công suất (E1) và điểm bão hoà
+imgsz (E2), và bằng một cơ chế khác hẳn.
+
+## Cái giá, và một lựa chọn tốt hơn
+
+near AP tụt **21%** trên 8K (so với 7% trên 1080p): cây gần cao tới 1256 px bị cắt
+qua nhiều tile ở kích thước tile 1280.
+
+E2 cho thấy **tăng imgsz không phải trả giá đó**: recall của cây 300 px native gần
+như không đổi qua các imgsz (0.924 → 0.922) trong khi tầng nhỏ cải thiện mạnh.
+
+⚠️ **So sánh chưa trực tiếp.** SAHI ở đây cho tỉ lệ 1:1 cảm biến (6× full-frame
+@1280), còn imgsz 3840 chỉ là 2× hạ mẫu; và E2 xuất **recall** chứ không xuất
+**AP**. Muốn kết luận chắc "tăng imgsz tốt hơn tiling" thì phải chạy AP ở imgsz
+2560/3840 để so cùng đơn vị. Chưa làm.
