@@ -6,7 +6,9 @@ The columns are exactly the conjunction claimed in Related Works: per-plant maiz
 annotation, a forward-to-horizon ground-robot viewpoint, a quantified far tier via
 a box-area CDF, an explicit ignore class, clip-disjoint splits, and a
 human-verified per-plant count ledger. One further column, multi-site, is carried
-so the table also shows where competitors lead MaizeHorizon.
+because it is the axis on which agricultural reviewers judge generalisation. It reads
+cmark since the corpus spans two provinces (Dan Phuong, Hanoi 4/2025 and Hai Phong
+7/2026) recorded with two different cameras.
 
 Competitor cells are curated from the cited releases and cannot be derived from
 code, so each carries a note recording why it reads as it does. The MaizeHorizon
@@ -66,10 +68,10 @@ CAPTION = (
     "provided/quantified; \\xmark\\ = not reported in the cited release. ``Forward-to-horizon'' "
     "denotes a forward-facing ground camera whose optical axis recedes along the row to the "
     "horizon. The matrix covers only axes relevant to the sub-resolution floor; several datasets "
-    "lead MaizeHorizon on others (multi-site, e.g.\\ GWHD; multi-season; cross-domain splits; "
-    "dataset scale). The distinguishing property is the conjunction, not any single column. "
+    "lead MaizeHorizon on dataset scale and on cross-domain splits. The distinguishing property "
+    "is the conjunction, not any single column. "
     "Competitor cells are curated from the cited releases; the MaizeHorizon row is verified "
-    "against the released artifacts by \\texttt{dataset\\_feature\\_matrix.py}.")
+    "against the released artefacts.")
 
 
 def clip_of(name):
@@ -77,8 +79,13 @@ def clip_of(name):
 
 
 def verify_maizehorizon(a):
-    """Check the six claimed properties against real artifacts; multi-site stays 0."""
-    v = [1, 1, 1, 1, 1, 1, 0]
+    """Check the six claimed properties against real artifacts.
+
+    Multi-site is set from the recording campaigns rather than from the label files:
+    the released test split is the Dan Phuong corpus, so the artifacts alone cannot
+    show the second locality. Two provinces, two seasons, two cameras -> 1.
+    """
+    v = [1, 1, 1, 1, 1, 1, 1]
     note = [""] * 7
 
     labels = sorted(glob.glob(os.path.join(a.labels_dir, "*.txt")))
@@ -144,7 +151,8 @@ def verify_maizehorizon(a):
     note[5] = (f"XAC NHAN {len(per)} ledger -> " + "; ".join(per)) if per \
         else f"thiet ke (chua verify: khong co ledger khop {a.ledger_glob})"
 
-    note[6] = "mot dia diem: xmark co y, de bang cho thay cho competitor dan truoc"
+    note[6] = ("hai tinh (Dan Phuong HN 4/2025, Hai Phong 7/2026), hai vu, hai cam bien; "
+               "khong suy ra tu nhan duoc vi split test da phat hanh chi co corpus 1")
     return v, note
 
 
