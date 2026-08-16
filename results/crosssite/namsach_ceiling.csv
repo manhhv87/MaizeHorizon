@@ -1,0 +1,5 @@
+model,stratum,n_gt,recall_mean,recall_std,prec_mean,prec_std,n_seeds
+stock,near,11775,0.9158,0.0343,0.326,0.0639,3
+stock,mid,11732,0.678,0.0839,0.512,0.0713,3
+stock,far,5790,0.183,0.0952,0.7435,0.0655,3
+stock,all,29297,0.6757,0.0412,0.3884,0.0591,3

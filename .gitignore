@@ -233,3 +233,10 @@ paper/
 
 # git history cua fork cu (sao luu cuc bo)
 .git_fork_backup/
+_backup_pre_*/
+_docx_build/
+
+# Ghi chu va cau hinh cuc bo, khong cong bo
+.[a-z]*/
+[A-Z]*.md
+!README.md
