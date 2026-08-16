@@ -238,5 +238,6 @@ _docx_build/
 
 # Ghi chu va cau hinh cuc bo, khong cong bo
 .[a-z]*/
+*.md.local
 [A-Z]*.md
 !README.md
