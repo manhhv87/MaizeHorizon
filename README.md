@@ -1,30 +1,54 @@
 # MaizeHorizon
 
-Far-field per-plant maize detection: network input size does not lower the floor.
+Sensor resolution and network input size jointly bound far-field per-plant maize
+detection.
 
 A forward-facing camera driving down a crop row turns per-plant detection into a
 far-field small-object problem — a distant seedling spans a handful of pixels and
-blends into the soil. Enlarging the network input is the standard reflex; this
-study shows it does not lower the floor, then rules out six candidate remedies,
-each against a control that would have exposed a real effect.
+blends into the soil. Enlarging the network input is the standard reflex, and
+whether it helps depends on the camera. This study locates the binding
+resolution, then rules out six candidate remedies, each against a control that
+would have exposed a real effect.
 
 ## Key result
 
-Stratifying recall by **input pixels-on-target** makes the curves shift with input
-size; stratifying by **native box height** makes them equivalent across inputs
-≥ 960, within ±0.073 recall. Across 24 paired comparisons among inputs 960, 1280
-and 1920, every difference falls inside that band and 12 favour the larger input
-against 12 the smaller — no systematic gain.
+Detectability is bounded by the **lesser** of the pixels the sensor resolves on
+the plant and the pixels the network input carries. Which one binds is measurable:
+raise the input in steps and find where half-recall stops improving.
 
-Half-recall sits near a 52 px native box height at the deployed operating point
-(confidence 0.25), but that height is not a sensor constant: it moves with
-plant–soil contrast (48–57 px) and drops to about 29 px at the recall ceiling.
+| Rig | Nominal | Saturates at | Effective resolution |
+|---|---|---|---|
+| Logitech C920, Dan Phuong | 1920 | input ≈ 960 | ≤ 960–1280 |
+| Samsung S23 8K, Nam Sach | 7680 | input ≈ 2560–3840 | ≈ 2560–3840 |
+
+On the webcam the **sensor** binds: recall by native box height is equivalent
+across inputs ≥ 960 within ±0.073, half-recall near a 52 px native box, and
+retraining at native 1920 gains nothing. On the 8K camera the **input** binds
+instead — raising it lifts recall on a 60 px native plant from 0.088 to 0.496 and
+extends half-recall range from 4.6 to 7.8 m on unchanged footage.
+
+The saturation point measures the detail a camera really delivers, which need not
+match its megapixel count. Two further measurements agree that the 8K frames
+carry nearer 2560 px of real detail: the power spectrum of the raw frames, and
+the sign of sliced inference, which loses 85% far AP where the sensor is
+exhausted and gains 143% where it is not.
 
 ## Dataset
 
-A forward-motion, range-stratified per-plant maize benchmark: 28 clips, 5,979
-frames at 1920×1080, with 3 held-out test clips hand-labelled with 4,067 plant and
-941 ignore boxes, stratified near/mid/far by pixels-on-target.
+A forward-motion, range-stratified per-plant maize benchmark spanning two
+campaigns that differ in locality, season and camera:
+
+| | Dan Phuong, Hanoi | Nam Sach, Hai Phong |
+|---|---|---|
+| Season | April 2025 | July 2026 |
+| Camera | Logitech C920, 1920×1080 | Samsung Galaxy S23, 7680×4320 |
+| Labelled frames | 120 (3 held-out clips) | 150 (2 sessions) |
+| Plant / ignore boxes | 4,067 / 941 | 29,297 / 6,482 |
+| Far tier at input 1280 | 82 | 5,790 |
+| … of which sub-12 px POT | 4 | 2,324 |
+
+The first also ships 28 clips and 5,979 unlabelled frames. The second is held out
+entirely: never trained on, evaluation only.
 
 Download: [doi:10.5281/zenodo.21775698](https://doi.org/10.5281/zenodo.21775698)
 (CC BY 4.0). Cite that concept DOI rather than a version-specific one. Both
@@ -53,9 +77,14 @@ the exact arguments for each step. Training entry points are `train.py` (stock a
 nearfar arms), `train_tbxrd_stage2.py` (distillation), `train_nwd.py`, and
 `exp_multiarch_train.py`.
 
-Two things to know: `max_det` differs by script (300 for recall and precision
-tables, 1000 for AP and the resolution sweep), and every CSV with an `n_gt` column
-should show 4,067 = 2,747 near / 1,238 mid / 82 far.
+Two things to know. `max_det` differs by script: 300 for recall and precision
+tables, 1000 for AP and the resolution sweep, and **3,000 for anything on Nam
+Sach**, which averages 238 annotated plants per frame against 34 for Dan Phuong.
+And `n_gt` should read 4,067 = 2,747 / 1,238 / 82 for Dan Phuong, 29,297 =
+11,775 / 11,732 / 5,790 for Nam Sach.
+
+`results/crosssite/README.md` holds the cross-site commands and four
+interpretation traps worth reading before quoting any number from them.
 
 ## Layout
 
@@ -68,6 +97,7 @@ should show 4,067 = 2,747 near / 1,238 mid / 82 far.
 | `exp_*.py` | resolution sweep, equivalence, contrast, range-matched, clustered CIs |
 | `train*.py`, `tbxrd_mint.py` | training and the forward-motion remedies |
 | `plot_*.py`, `make_paper_figures.py` | figures |
+| `exp_range_validation.py`, `scripts/` | metric-distance validation, sensor ablation, Word build |
 
 Each arm's `images/` is a symlink to `data/images`, so no image bytes are
 duplicated.
@@ -76,16 +106,16 @@ duplicated.
 
 ```bibtex
 @article{maizehorizon,
-  title  = {Far-Field Per-Plant Maize Detection: Network Input Size
-            Does Not Lower the Floor},
-  author = {Hoang, Manh V.},
+  title  = {Sensor resolution and network input size jointly bound
+            far-field per-plant maize detection},
+  author = {Hoang, Manh V. and Nguyen, Truong Q.},
   year   = {2026}
 }
 
 @dataset{maizehorizon_data,
   title     = {MaizeHorizon: a forward-motion, range-stratified per-plant maize
                detection dataset},
-  author    = {Hoang, Manh V.},
+  author    = {Hoang, Manh V. and Nguyen, Truong Q.},
   year      = {2026},
   publisher = {Zenodo},
   doi       = {10.5281/zenodo.21775698}
