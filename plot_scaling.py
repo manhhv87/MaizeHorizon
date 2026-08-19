@@ -13,6 +13,25 @@ import argparse
 import csv
 from collections import defaultdict
 
+# Nhan theo ngon ngu, cho ban tieng Viet cua paper (paper/vi).
+# Mac dinh 'en' nen hinh cua ban English khong doi.
+L10N = {
+    "en": {"suptitle": "Recall by native box height is flat above input 960; "
+                       "recall by input POT merely shifts",
+           "titleA": "(A) Recall vs. pixels-on-target",
+           "titleB": "(B) Recall vs. physical box height",
+           "xlabelA": "Pixels-on-target (box height, px @ eval imgsz)",
+           "xlabelB": "Physical box height (px in original frame) -- smaller = farther",
+           "ylabel": "Per-plant recall"},
+    "vi": {"suptitle": "Recall theo chiều cao hộp gốc bằng phẳng trên đầu vào 960; "
+                       "recall theo POT chỉ dịch chỗ",
+           "titleA": "(A) Recall theo số điểm ảnh trên mục tiêu",
+           "titleB": "(B) Recall theo chiều cao hộp gốc",
+           "xlabelA": "Số điểm ảnh trên mục tiêu (chiều cao hộp, px @ imgsz đánh giá)",
+           "xlabelB": "Chiều cao hộp trong khung gốc (px) — nhỏ hơn = xa hơn",
+           "ylabel": "Recall theo từng cây"},
+}
+
 
 def load(path):
     d = defaultdict(list)  # imgsz -> [(x_mid, rec, std, n)]
@@ -44,12 +63,18 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--prefix", required=True, help="prefix written by exp_resolution_sweep (_pot.csv, _phys.csv)")
     ap.add_argument("--out", default=None)
-    ap.add_argument("--title", default="Recall by native box height is flat above input 960; recall by input POT merely shifts")
+    ap.add_argument("--lang", choices=("en", "vi"), default="en", help="ngon ngu nhan truc")
+    ap.add_argument("--title", default=None, help="ghi de tieu de (mac dinh: theo --lang)")
     a = ap.parse_args()
+    T = L10N[a.lang]
     out = a.out or f"{a.prefix}_fig"
 
     import matplotlib
     matplotlib.use("Agg")
+    if a.lang != "en":
+        # Type 3 chi mang duoc 256 ky tu -> dau tieng Viet khong trich xuat duoc.
+        # Type 42 (TrueType) nhung nguyen font nen chu van copy/tim kiem duoc.
+        matplotlib.rcParams["pdf.fonttype"] = 42
     import matplotlib.pyplot as plt
 
     pot = load(f"{a.prefix}_pot.csv")
@@ -73,10 +98,10 @@ def main():
                  label=f"imgsz {im}", zorder=3)
         lo = [max(0, y - e) for y, e in zip(ys, es)]; up = [min(1, y + e) for y, e in zip(ys, es)]
         axA.fill_between(xs, lo, up, color=colors[im], alpha=0.12, zorder=2)
-    axA.set_xlabel("Pixels-on-target (box height, px @ eval imgsz)")
-    axA.set_ylabel("Per-plant recall")
+    axA.set_xlabel(T["xlabelA"])
+    axA.set_ylabel(T["ylabel"])
     axA.set_xlim(0, 100); axA.set_ylim(-0.02, 1.08)
-    axA.set_title("(A) Recall vs. pixels-on-target", fontsize=10)
+    axA.set_title(T["titleA"], fontsize=10)
     axA.legend(loc="lower right", fontsize=8, framealpha=0.9); axA.grid(alpha=0.25)
 
     # --- Panel B: recall vs physical box height (shift) ---
@@ -91,13 +116,13 @@ def main():
     axB.axhline(0.5, color="#7f8c8d", ls=":", lw=1.0)
     axB.axvspan(0, 32, color="#f2c8c8", alpha=0.30, lw=0, zorder=0)   # floor vat ly ~24-32px
     axB.axvline(52, color="#c0392b", ls="--", lw=1.0, zorder=1); axB.text(52, 1.03, "h50~52px", color="#c0392b", ha="center", fontsize=8)
-    axB.set_xlabel("Physical box height (px in original frame) -- smaller = farther")
-    axB.set_ylabel("Per-plant recall")
+    axB.set_xlabel(T["xlabelB"])
+    axB.set_ylabel(T["ylabel"])
     axB.set_xlim(0, 160); axB.set_ylim(-0.02, 1.08)
-    axB.set_title("(B) Recall vs. physical box height", fontsize=10)
+    axB.set_title(T["titleB"], fontsize=10)
     axB.legend(loc="lower right", fontsize=8, framealpha=0.9); axB.grid(alpha=0.25)
 
-    fig.suptitle(a.title, fontsize=11)
+    fig.suptitle(a.title or T["suptitle"], fontsize=11)
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     for ext in ("pdf", "png"):
         fig.savefig(f"{out}.{ext}", dpi=200)
