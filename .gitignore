@@ -216,8 +216,23 @@ data/
 /yolov10s.pt
 /rtdetr-l.pt
 
-# fork ultralytics: cai qua pip (requirements.txt ghim ultralytics==8.3.160)
-ultralytics/
+# fork ultralytics: KHONG commit ca fork (xem requirements.txt).
+# NGOAI LE: ba module viet rieng cho bai nay khong co trong ban ultralytics
+# tren PyPI, nen phai di kem repo -- neu thieu thi train_tbxrd_stage2.py
+# khong chay duoc. Git khong duyet vao thu muc da bi ignore, nen phai mo
+# tung cap mot bang '<dir>/*' roi phu dinh lai.
+ultralytics/*
+!ultralytics/utils/
+ultralytics/utils/*
+!ultralytics/utils/tbxrd.py
+!ultralytics/utils/sgc_ext.py
+!ultralytics/models/
+ultralytics/models/*
+!ultralytics/models/yolo/
+ultralytics/models/yolo/*
+!ultralytics/models/yolo/detect/
+ultralytics/models/yolo/detect/*
+!ultralytics/models/yolo/detect/tbxrd_train.py
 
 # code/tai lieu khong thuoc duong tai lap ket qua
 _archive/
