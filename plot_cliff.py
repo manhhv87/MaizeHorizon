@@ -14,16 +14,35 @@ import argparse
 import csv
 from collections import defaultdict
 
+# Nhan theo ngon ngu. Ban tieng Viet cua paper (paper/vi) can hinh co nhan tieng Viet;
+# mac dinh van la tieng Anh nen hinh cua ban English khong doi.
+L10N = {
+    "en": {"title": "Recall vs. pixels-on-target (forward-motion maize seedlings)",
+           "far": "far (<16 px)", "mid": "mid", "near": "near (>=32 px)",
+           "xlabel": "Pixels-on-target (box height, px @ imgsz 1280)",
+           "ylabel": "Per-plant recall"},
+    "vi": {"title": "Recall theo số điểm ảnh trên mục tiêu (cây ngô con, chuyển động tiến)",
+           "far": "xa (<16 px)", "mid": "giữa", "near": "gần (≥ 32 px)",
+           "xlabel": "Số điểm ảnh trên mục tiêu (chiều cao hộp, px @ imgsz 1280)",
+           "ylabel": "Recall theo từng cây"},
+}
+
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--csv", required=True, help="*_curve.csv tu eval_testset/eval_stratified")
     ap.add_argument("--out", default="fig_cliff", help="tien to -> .pdf + .png")
-    ap.add_argument("--title", default="Recall vs. pixels-on-target (forward-motion maize seedlings)")
+    ap.add_argument("--lang", choices=("en", "vi"), default="en", help="ngon ngu nhan truc")
+    ap.add_argument("--title", default=None, help="ghi de tieu de (mac dinh: theo --lang)")
     ap.add_argument("--only", nargs="+", default=None, help="plot only these arms (default: all)")
     a = ap.parse_args()
+    T = L10N[a.lang]
     import matplotlib
     matplotlib.use("Agg")
+    if a.lang != "en":
+        # Type 3 chi mang duoc 256 ky tu -> dau tieng Viet khong trich xuat duoc.
+        # Type 42 (TrueType) nhung nguyen font nen chu van copy/tim kiem duoc.
+        matplotlib.rcParams["pdf.fonttype"] = 42
     import matplotlib.pyplot as plt
 
     rows = list(csv.DictReader(open(a.csv, encoding="utf-8")))
@@ -55,9 +74,9 @@ def main():
     plt.axvspan(0, 16, color="#f2c8c8", alpha=0.35, lw=0, zorder=0)
     plt.axvline(16, color="#c0392b", ls="--", lw=1.2, zorder=1)
     plt.axvline(32, color="#7f8c8d", ls=":", lw=1.0, zorder=1)
-    plt.text(8, 1.02, "far (<16 px)", color="#c0392b", ha="center", fontsize=7)
-    plt.text(24, 1.02, "mid", color="#555", ha="center", fontsize=8)
-    plt.text(64, 1.02, "near (>=32 px)", color="#555", ha="center", fontsize=8)
+    plt.text(8, 1.02, T["far"], color="#c0392b", ha="center", fontsize=7)
+    plt.text(24, 1.02, T["mid"], color="#555", ha="center", fontsize=8)
+    plt.text(64, 1.02, T["near"], color="#555", ha="center", fontsize=8)
 
     markers = ["o", "s", "^", "D", "v", "P"]
     for i, m in enumerate(models):
@@ -66,10 +85,10 @@ def main():
         lo = [max(0, y - e) for y, e in zip(ys, es)]; up = [min(1, y + e) for y, e in zip(ys, es)]
         plt.fill_between(xs, lo, up, alpha=0.15, zorder=2)
 
-    plt.xlabel("Pixels-on-target (box height, px @ imgsz 1280)")
-    plt.ylabel("Per-plant recall")
+    plt.xlabel(T["xlabel"])
+    plt.ylabel(T["ylabel"])
     plt.ylim(-0.02, 1.08); plt.xlim(0, max(110, max(d[0] for m in models for d in data[m]) + 5))
-    plt.title(a.title, fontsize=10)
+    plt.title(a.title or T["title"], fontsize=10)
     plt.legend(loc="lower right", fontsize=8, framealpha=0.9)
     plt.grid(alpha=0.25, zorder=0)
     plt.tight_layout()
