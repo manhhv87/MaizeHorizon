@@ -71,13 +71,14 @@ def eval_one_imgsz(cps, items, imgsz, args):
     """Return per-seed recall by POT bin and by physical bin, per-tier recall and precision, and n_gt.
 
     Precision is ignore-aware, as in eval_testset.recall_one."""
-    from ultralytics import YOLO
+    # RT-DETR khong route qua YOLO() tran; dung loader chung cua rebuttal_common
+    from rebuttal_common import load_detector
     npot = len(FINE_EDGES) - 1
     nphys = len(PHYS_EDGES) - 1
     pot_rec, phys_rec, tier_rec, tier_prec, phys_prec = [], [], [], [], []
     pot_n = np.zeros(npot); phys_n = np.zeros(nphys); tier_n = {s: 0 for s in STRATA}
     for si, cp in enumerate(cps):
-        model = YOLO(cp)
+        model = load_detector(cp, args.tag)
         pdet = np.zeros(npot); pth = np.zeros(nphys); pfp = np.zeros(nphys)
         tdet = {s: 0 for s in STRATA}
         tfp = {s: 0 for s in STRATA}

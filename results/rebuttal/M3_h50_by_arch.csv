@@ -1,0 +1,9 @@
+arch,imgsz,h50_native_px,n_bins_used
+rtdetr-l,640,33.27,6
+rtdetr-l,960,28.74,6
+rtdetr-l,1280,29.85,6
+rtdetr-l,1920,33.56,6
+yolov8s+Mint,640,60.87,6
+yolov8s+Mint,960,53.17,6
+yolov8s+Mint,1280,52.29,6
+yolov8s+Mint,1920,52.19,6
