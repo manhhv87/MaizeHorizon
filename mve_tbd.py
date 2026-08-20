@@ -28,11 +28,29 @@ EXCL_R = 36.0   # px: decoy phai cach moi tam cay GT it nhat ngan nay
 
 
 def rank_auc(pos, neg):
+    """Mann-Whitney AUC, with midranks so tied values count as half a win.
+
+    Ties decide the answer in this experiment. If the detector never fires below the floor,
+    every on-track and every decoy integral is exactly 0, and the honest statistic is 0.5:
+    the two samples are indistinguishable because there is nothing in either of them.
+    Ordinal ranks would instead hand the tied positives the lowest ranks (pos is concatenated
+    first, and the sort is stable) and report 0.000 -- indistinguishable from decoys genuinely
+    beating real plants, which is a different and much stronger claim than the one the data
+    support. Use the zero-response diagnostic below to tell an empty integrand from a real one.
+    """
     pos = np.asarray(pos, float); neg = np.asarray(neg, float)
     if len(pos) == 0 or len(neg) == 0:
         return float("nan"), len(pos)
-    allv = np.concatenate([pos, neg]); order = allv.argsort(kind="mergesort")
-    ranks = np.empty(len(allv), float); ranks[order] = np.arange(1, len(allv) + 1)
+    allv = np.concatenate([pos, neg])
+    order = allv.argsort(kind="mergesort"); srt = allv[order]
+    ranks = np.empty(len(allv), float)
+    i = 0
+    while i < len(srt):
+        j = i
+        while j + 1 < len(srt) and srt[j + 1] == srt[i]:
+            j += 1
+        ranks[order[i:j + 1]] = (i + j) / 2.0 + 1.0   # midrank shared by the tied block
+        i = j + 1
     rpos = ranks[:len(pos)].sum()
     return float((rpos - len(pos) * (len(pos) + 1) / 2) / (len(pos) * len(neg))), len(pos)
 
@@ -171,6 +189,20 @@ def main():
         print(f"{str(b):12}" + "".join((f"{c:>10.3f}" if not np.isnan(c) else f"{'-':>10}") for c in cells) + f"{npos:>8}")
         if b[1] <= 16 and not np.isnan(cells[0]) and not np.isnan(cells[-1]):
             go.append((b, cells[0], cells[-1]))
+
+    # An AUC of 0.5 means "the two samples do not separate", which has two very different
+    # causes: a response exists on both sides and does not discriminate, or no response
+    # exists at all. Only the second supports the claim that there is nothing to integrate,
+    # so report it rather than leaving the reader to infer it from the AUC.
+    kmax = a.ks[-1]
+    print(f"\n# zero-response check at K={kmax}: share of integrals that are exactly 0")
+    for b in POT_BINS:
+        p, n = rows[b][kmax]
+        if not len(p) or not len(n):
+            continue
+        zp = float(np.mean(np.asarray(p, float) == 0)); zn = float(np.mean(np.asarray(n, float) == 0))
+        note = "  <- empty integrand on both sides" if zp == 1.0 and zn == 1.0 else ""
+        print(f"  bin {str(b):10} on-track {zp:6.1%} zero (n={len(p)}),  decoy {zn:6.1%} zero (n={len(n)}){note}")
 
     print("\n# a positive result needs AUC to rise with K by >=0.05 and exceed 0.62 in the POT<16 bins")
     any_go = False

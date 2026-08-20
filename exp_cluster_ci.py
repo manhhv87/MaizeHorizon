@@ -11,6 +11,10 @@ count ledger, reports how many distinct plants back each tier, and replaces the
 box-level Wilson interval with a bootstrap that resamples plants (and, separately,
 clips) as the unit of replication.
 
+Recall is averaged over seeds, but the Wilson comparator is computed on the distinct
+box count (n_box), not on the seed-pooled observation count (n_obs = n_box x n_seed):
+the seeds re-score the same boxes, so pooling them is not extra sampling.
+
     python exp_cluster_ci.py --labels-dir data/test/labels --images-dir data/test/images \
         --runs runs --tags stock nearfar --seeds 0 1 2 --out results/detection/cluster_ci.csv
 
@@ -199,22 +203,34 @@ def main():
             allrec = [r for s in per_seed for r in per_seed[s] if r[0] == t]
             if not allrec:
                 continue
-            k = sum(r[3] for r in allrec); n = len(allrec)
-            wl, wh = wilson(k, n)
+            n_obs = len(allrec)
+            recall = sum(r[3] for r in allrec) / n_obs
+            # The Wilson interval is the naive box-level comparator this script exists to
+            # argue against, so it must use the number of DISTINCT annotated boxes. Every
+            # seed scores the same boxes, so pooling the seeds counts each box n_seed
+            # times and narrows the interval by sqrt(n_seed) -- which would understate the
+            # comparator and overstate how much the clustering below widens it. Counting
+            # one seed's records is exact even if a seed was skipped.
+            first = next(iter(per_seed))
+            n_box = sum(1 for r in per_seed[first] if r[0] == t)
+            wl, wh = wilson(recall * n_box, n_box)
+            # The bootstraps resample plants and clips, so their unit count is already
+            # right; each group simply holds n_seed outcomes per box and the point
+            # estimate it resamples is the seed-averaged recall.
             gp, gc = defaultdict(list), defaultdict(list)
             for _, p, c, h in allrec:
                 gp[p].append(h); gc[c].append(h)
             pl, ph = boot(gp)
             cl_, ch = boot(gc)
-            print(f"  {t:6s} {k/n:>7.4f}  [{wl:.3f}, {wh:.3f}] w={wh-wl:.3f}  "
+            print(f"  {t:6s} {recall:>7.4f}  [{wl:.3f}, {wh:.3f}] w={wh-wl:.3f}  "
                   f"[{pl:.3f}, {ph:.3f}] w={ph-pl:.3f}  [{cl_:.3f}, {ch:.3f}]")
-            rows.append([tag, t, n, len(gp), len(gc), f"{k/n:.4f}",
+            rows.append([tag, t, n_box, len(per_seed), n_obs, len(gp), len(gc), f"{recall:.4f}",
                          f"{wl:.4f}", f"{wh:.4f}", f"{pl:.4f}", f"{ph:.4f}", f"{cl_:.4f}", f"{ch:.4f}"])
 
     os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
     with open(a.out, "w", newline="") as fh:
         w = csv.writer(fh)
-        w.writerow(["tag", "tier", "n_box", "n_plant", "n_clip", "recall",
+        w.writerow(["tag", "tier", "n_box", "n_seed", "n_obs", "n_plant", "n_clip", "recall",
                     "wilson_lo", "wilson_hi", "plantboot_lo", "plantboot_hi",
                     "clipboot_lo", "clipboot_hi"])
         w.writerows(rows)
