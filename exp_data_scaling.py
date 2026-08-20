@@ -82,7 +82,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--arm", default="nearfar")
     ap.add_argument("--fracs", nargs="+", type=float, default=[0.25, 0.5])
-    ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--seeds", nargs="+", type=int, default=[0],
+                    help="moi seed rut mot tap con RIENG va mot khoi tao rieng, nen"
+                         " do tan mac bao gom ca bien thien do rut mau")
     ap.add_argument("--labels-dir", required=True)
     ap.add_argument("--images-dir", required=True)
     ap.add_argument("--imgsz", type=int, default=1280)
@@ -99,16 +101,21 @@ def main():
     tags = []
     for fr in a.fracs:
         tag = f"scale{int(round(fr*100)):03d}"
-        n, tot = build_subset(arm_dir, fr, a.seed, os.path.join("data", "arms", tag))
-        print(f"[{tag}] {n}/{tot} khung ({100*n/tot:.0f}%)")
-        tags.append((tag, n, fr))
-        if not a.skip_train:
-            subprocess.run([PY, "train.py", "--arm", a.arm, "--name", tag,
-                            "--data", os.path.join(arm_dir.replace(a.arm, tag), "data.yaml"),
-                            "--seeds", str(a.seed), "--imgsz", str(a.imgsz),
-                            "--epochs", str(a.epochs), "--patience", str(a.patience),
-                            "--batch", str(a.batch), "--device", a.device,
-                            "--runs", a.runs], check=True)
+        for sd in a.seeds:
+            # tap con dung lai theo seed ngay truoc khi train seed do, nen moi seed
+            # thay mot bo khung khac; deterministic vi random.Random(sd)
+            n_, tot = build_subset(arm_dir, fr, sd, os.path.join("data", "arms", tag))
+            print(f"[{tag} seed {sd}] {n_}/{tot} khung ({100*n_/tot:.0f}%)", flush=True)
+            if os.path.exists(os.path.join(a.runs, f"{tag}_s{sd}", "weights", "best.pt")):
+                print(f"  da co checkpoint, bo qua train", flush=True); continue
+            if not a.skip_train:
+                subprocess.run([PY, "train.py", "--arm", a.arm, "--name", tag,
+                                "--data", os.path.join(arm_dir.replace(a.arm, tag), "data.yaml"),
+                                "--seeds", str(sd), "--imgsz", str(a.imgsz),
+                                "--epochs", str(a.epochs), "--patience", str(a.patience),
+                                "--batch", str(a.batch), "--device", a.device,
+                                "--runs", a.runs], check=True)
+        tags.append((tag, n_, fr))
 
     # diem 100% dung lai checkpoint san co cua chinh nhanh do
     tags.append((a.arm, sum(1 for _ in open(os.path.join(arm_dir, "train.txt"))), 1.0))
@@ -118,22 +125,28 @@ def main():
     subprocess.run([PY, "eval_testset.py", "--labels-dir", a.labels_dir,
                     "--images-dir", a.images_dir, "--runs", a.runs,
                     "--tags"] + [t for t, _, _ in tags] +
-                   ["--seeds", str(a.seed), "--iou", "0.3", "--conf", "0.001",
+                   ["--seeds"] + [str(x) for x in a.seeds] +
+                   ["--iou", "0.3", "--conf", "0.001",
                     "--imgsz", str(a.imgsz), "--max-det", "1000",
                     "--device", a.device, "--out", tmp], check=True)
 
-    rec = {(r["model"], r["stratum"]): r["recall_mean"] for r in csv.DictReader(open(tmp))}
+    rd = list(csv.DictReader(open(tmp)))
+    rec = {(r["model"], r["stratum"]): r["recall_mean"] for r in rd}
+    sd_ = {(r["model"], r["stratum"]): r.get("recall_std", "") for r in rd}
     rows = []
     print(f"\n{'nhanh':10} {'khung':>6} {'phan':>5}  {'near':>7} {'mid':>7} {'far':>7}")
     for tag, n, fr in tags:
         v = [rec.get((tag, s), "") for s in ("near", "mid", "far")]
-        print(f"{tag:10} {n:>6} {fr:>5.2f}  " + " ".join(f"{float(x):7.4f}" if x else f"{'-':>7}" for x in v))
-        rows.append([tag, n, f"{fr:.2f}"] + list(v))
+        e = [sd_.get((tag, s), "") for s in ("near", "mid", "far")]
+        print(f"{tag:10} {n:>6} {fr:>5.2f}  " + " ".join(
+            f"{float(x):.4f}+/-{float(y or 0):.4f}" if x else f"{'-':>13}" for x, y in zip(v, e)))
+        rows.append([tag, n, f"{fr:.2f}"] + [q for pair in zip(v, e) for q in pair])
     if a.out:
         os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
         with open(a.out, "w", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
-            w.writerow(["arm", "n_train_frames", "fraction", "recall_near", "recall_mid", "recall_far"])
+            w.writerow(["arm", "n_train_frames", "fraction", "recall_near", "std_near",
+                        "recall_mid", "std_mid", "recall_far", "std_far"])
             w.writerows(rows)
         print(f"\n[OK] -> {a.out}")
 
