@@ -32,30 +32,58 @@ import sys
 PY = sys.executable
 
 
-def build_subset(arm_dir, frac, seed, out_dir):
-    """Tao mot nhanh con: train.txt lay mau, valid.txt giu nguyen, symlink dung chung anh."""
-    os.makedirs(out_dir, exist_ok=True)
-    lines = [l.strip() for l in open(os.path.join(arm_dir, "train.txt"), encoding="utf-8") if l.strip()]
+def far_frames(arm_dir, imgsz=1280, W=1920, H=1080, thresh=16.0):
+    """Cac dong trong train.txt ma khung do co it nhat mot box duoi nguong POT."""
+    from eval_testset import read_gt
+    sc = imgsz / max(W, H)
+    out = []
+    for ln in open(os.path.join(arm_dir, "train.txt"), encoding="utf-8"):
+        rel = ln.strip()
+        if not rel:
+            continue
+        lp = os.path.join("data", rel.replace("/images/", "/labels/").rsplit(".", 1)[0] + ".txt")
+        if not os.path.exists(lp):
+            continue
+        if any((b[3] - b[1]) * sc < thresh for b in read_gt(lp, W, H, 0, 1)[0]):
+            out.append(rel)
+    return out
+
+
+def build_oversampled(arm_dir, repeat, seed, out_dir):
+    """Doi THANH PHAN ma giu nguyen TONG SO khung, de so sanh khop chi phi.
+
+    Cac khung chua box tang xa duoc lap `repeat` lan; phan con lai lay ngau nhien
+    cho du tong so bang tap goc. Model vi the thay vi du tang xa nhieu gap `repeat`
+    lan ma khong ton them mot buoc huan luyen nao.
+    """
+    allf = [l.strip() for l in open(os.path.join(arm_dir, "train.txt"), encoding="utf-8") if l.strip()]
+    far = far_frames(arm_dir)
+    rest = [x for x in allf if x not in set(far)]
+    slots = far * repeat
     rng = random.Random(seed)
-    keep = rng.sample(lines, max(1, int(round(len(lines) * frac))))
-    keep.sort()
-    tag = os.path.basename(out_dir)
-    # duong dan trong train.txt tuong doi so voi 'path:' cua data.yaml -> phai doi ten nhanh
+    need = len(allf) - len(slots)
+    if need < 0:
+        slots = slots[:len(allf)]; need = 0
+    keep = slots + rng.sample(rest, need)
+    rng.shuffle(keep)
+    return keep, far, allf
+
+
+def write_arm(arm_dir, keep, tag, out_dir):
+    """Ghi mot nhanh: train.txt/valid.txt duong dan TUYET DOI, symlink anh, chep nhan can dung."""
+    os.makedirs(out_dir, exist_ok=True)
     src_tag = os.path.basename(arm_dir)
-    # Duong dan TUYET DOI. Ultralytics chi viet lai duong dan bat dau bang './'; con lai
-    # no giu nguyen va giai theo thu muc lam viec, nen duong dan tuong doi trong train.txt
-    # chi chay khi DATASETS_DIR duoc tro dung. Ghi tuyet doi thi thi nghiem tu dung duoc.
     data_root = os.path.abspath(os.path.join(out_dir, "..", ".."))
+
     def absify(rel):
         return os.path.join(data_root, rel.replace(f"arms/{src_tag}/", f"arms/{tag}/"))
+
     open(os.path.join(out_dir, "train.txt"), "w", encoding="utf-8").write(
         "\n".join(absify(p) for p in keep) + "\n")
     vlines = [l.strip() for l in open(os.path.join(arm_dir, "valid.txt"), encoding="utf-8") if l.strip()]
     open(os.path.join(out_dir, "valid.txt"), "w", encoding="utf-8").write(
         "\n".join(absify(p) for p in vlines) + "\n")
-    # anh: symlink (nhieu GB, khong duoc chep). nhan: CHEP that, chi nhung file can dung.
-    # Ultralytics ghi file .cache canh thu muc nhan; neu nhan la symlink dung chung thi
-    # cac tap con dam cache cua nhau va scan ra 0 anh hop le.
+
     img_dst = os.path.join(out_dir, "images")
     if not os.path.lexists(img_dst):
         os.symlink(os.path.relpath(os.path.realpath(os.path.join(arm_dir, "images")), out_dir), img_dst)
@@ -63,18 +91,22 @@ def build_subset(arm_dir, frac, seed, out_dir):
     if os.path.islink(lab_dst):
         os.unlink(lab_dst)
     src_lab = os.path.realpath(os.path.join(arm_dir, "labels"))
-    for rel in list(keep) + vlines:
+    for rel in set(list(keep) + vlines):
         r = rel.split(f"arms/{src_tag}/images/", 1)[-1].rsplit(".", 1)[0] + ".txt"
         s_, d_ = os.path.join(src_lab, r), os.path.join(lab_dst, r)
         os.makedirs(os.path.dirname(d_), exist_ok=True)
         if os.path.exists(s_) and not os.path.exists(d_):
             shutil.copy(s_, d_)
-    # 'path' phai TUYET DOI: Ultralytics giai duong dan tuong doi theo DATASETS_DIR cua no,
-    # khong theo vi tri file yaml (chinh data.yaml goc cua repo co ghi chu canh bao dieu nay).
-    abs_data = os.path.abspath(os.path.join(out_dir, "..", ".."))
     with open(os.path.join(out_dir, "data.yaml"), "w", encoding="utf-8") as f:
-        f.write(f"path: {abs_data}\ntrain: arms/{tag}/train.txt\nval: arms/{tag}/valid.txt\n\n"
+        f.write(f"path: {data_root}\ntrain: arms/{tag}/train.txt\nval: arms/{tag}/valid.txt\n\n"
                 f"names:\n  0: plant\n  1: ignore\n")
+
+
+def build_subset(arm_dir, frac, seed, out_dir):
+    """Lay mau ngau nhien co seed tu train.txt cua mot nhanh."""
+    lines = [l.strip() for l in open(os.path.join(arm_dir, "train.txt"), encoding="utf-8") if l.strip()]
+    keep = sorted(random.Random(seed).sample(lines, max(1, int(round(len(lines) * frac)))))
+    write_arm(arm_dir, keep, os.path.basename(out_dir), out_dir)
     return len(keep), len(lines)
 
 
@@ -95,10 +127,34 @@ def main():
     ap.add_argument("--runs", default="runs")
     ap.add_argument("--out")
     ap.add_argument("--skip-train", action="store_true", help="chi danh gia lai checkpoint da co")
+    ap.add_argument("--oversample-far", type=int, default=0,
+                    help="thay vi quet ti le, dung MOT tap cung kich thuoc nhung lap cac khung\n"
+                         "co box tang xa N lan (doi thanh phan, giu nguyen chi phi)")
     a = ap.parse_args()
 
     arm_dir = os.path.join("data", "arms", a.arm)
     tags = []
+
+    if a.oversample_far:
+        tag = f"farx{a.oversample_far}"
+        out_dir = os.path.join("data", "arms", tag)
+        for sd in a.seeds:
+            keep, far, allf = build_oversampled(arm_dir, a.oversample_far, sd, out_dir)
+            write_arm(arm_dir, keep, tag, out_dir)
+            print(f"[{tag} seed {sd}] {len(keep)} suat = {len(far)} khung co tang xa x{a.oversample_far}"
+                  f" + {len(keep)-len(far)*a.oversample_far} khung khac (goc {len(allf)})", flush=True)
+            if os.path.exists(os.path.join(a.runs, f"{tag}_s{sd}", "weights", "best.pt")):
+                print("  da co checkpoint, bo qua train", flush=True); continue
+            if not a.skip_train:
+                subprocess.run([PY, "train.py", "--arm", a.arm, "--name", tag,
+                                "--data", os.path.join(out_dir, "data.yaml"),
+                                "--seeds", str(sd), "--imgsz", str(a.imgsz),
+                                "--epochs", str(a.epochs), "--patience", str(a.patience),
+                                "--batch", str(a.batch), "--device", a.device,
+                                "--runs", a.runs], check=True)
+        tags.append((tag, len(keep), float(a.oversample_far)))
+        a.fracs = []
+
     for fr in a.fracs:
         tag = f"scale{int(round(fr*100)):03d}"
         for sd in a.seeds:
