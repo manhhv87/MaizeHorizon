@@ -34,6 +34,7 @@ def main():
     ap.add_argument("--optimizer", default="auto")
     ap.add_argument("--device", default="0")
     ap.add_argument("--runs", default="runs")
+    ap.add_argument("--name", default=None, help="ghi de ten thu muc run; mac dinh <arm>_s<seed>")
     a = ap.parse_args()
 
     from ultralytics import YOLO
@@ -42,7 +43,7 @@ def main():
         raise SystemExit(f"data.yaml not found: {data}")
 
     for seed in a.seeds:
-        name = f"{a.arm}_s{seed}"
+        name = f"{a.name or a.arm}_s{seed}"
         print(f"\n========== train {name} ==========", flush=True)
         YOLO(a.model).train(
             data=data, epochs=a.epochs, patience=a.patience, imgsz=a.imgsz, batch=a.batch,
