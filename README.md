@@ -1,7 +1,7 @@
 # MaizeHorizon
 
-Sensor resolution and network input size jointly bound far-field per-plant maize
-detection.
+Measuring the binding resolution in far-field per-plant maize detection: network
+input size does not extend range.
 
 A forward-facing camera driving down a crop row turns per-plant detection into a
 far-field small-object problem — a distant seedling spans a handful of pixels and
@@ -106,8 +106,8 @@ duplicated.
 
 ```bibtex
 @article{maizehorizon,
-  title  = {Sensor resolution and network input size jointly bound
-            far-field per-plant maize detection},
+  title  = {Measuring the binding resolution in far-field per-plant maize
+            detection: network input size does not extend range},
   author = {Hoang, Manh V. and Nguyen, Truong Q.},
   year   = {2026}
 }
