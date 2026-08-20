@@ -318,3 +318,60 @@ như không đổi qua các imgsz (0.924 → 0.922) trong khi tầng nhỏ cải
 @1280), còn imgsz 3840 chỉ là 2× hạ mẫu; và E2 xuất **recall** chứ không xuất
 **AP**. Muốn kết luận chắc "tăng imgsz tốt hơn tiling" thì phải chạy AP ở imgsz
 2560/3840 để so cùng đơn vị. Chưa làm.
+
+---
+
+# E4 — Doi chung scale-matching: quet input tren khung DA HA MAU
+
+Cau hoi: gain cua E2 la do cam bien giao them chi tiet, hay chi vi cay dich vao
+dai kich thuoc bieu kien ma mang da hoc (moi detector train o input 1280)?
+
+Khung ha mau 1920x1080 khong mang chi tiet nao tren 1080p. Vi nhan chuan hoa nen
+moi cay co POT y het o ca hai nhanh tai moi input -> kich thuoc bieu kien duoc
+giu co dinh, chi khac luong chi tiet.
+
+```bash
+"$PY" scripts/downsample_hd.py --src "$SRC2" --dst "$SRC2_1080"
+
+"$PY" exp_resolution_sweep.py \
+  --labels-dir "$SRC2_1080/labels" --images-dir "$SRC2_1080/images" \
+  --runs runs --tag stock --seeds 0 1 2 --imgsz-list 1280 1920 2560 3840 \
+  --iou 0.3 --conf 0.001 --max-det 3000 --device 0 \
+  --out-prefix results/crosssite/hd1080_sweep
+```
+
+⚠️ Doc `hd1080_sweep_pot.csv`, KHONG doc cot `h50_phys_px` cua `_range.csv` —
+cung cai bay da ghi o E2. h50 tinh lai tu duong cong POT, chi dung bin n_gt >= 100.
+
+## Ket qua — h50 quy ve chieu cao native trong khung 8K goc (px)
+
+| input | 8K goc | ha mau 1080p |
+|---|---|---|
+| 1280 | 110.9 | 122.2 |
+| 1920 |  83.6 |  92.1 |
+| 2560 |  65.2 | 103.1 |
+| 3840 |  60.5 |  98.3 |
+
+Nhanh ha mau cai thien toi 1920 (do phan giai khung cua chinh no) roi DUNG.
+Nhanh goc di tiep toi 2560. Tai input 2560, cung 14px POT: 0.399 vs 0.047.
+
+=> Scale matching mot minh KHONG giai thich duoc gain cua E2. Cach doc
+"input binds tren camera 8K" dung vung.
+
+## Bay: khong retrain duoc neu DATASETS_DIR sai (phat hien 20/08/2026)
+
+`data/arms/*/data.yaml` dung `path: data` va `train.txt` chua duong dan TUONG DOI
+(`arms/<tag>/images/...`). Ultralytics chi viet lai duong dan bat dau bang `./`; con lai
+no giu nguyen va giai theo thu muc lam viec, khong theo vi tri file yaml.
+
+Hau qua: neu `yolo settings datasets_dir` khong tro dung goc repo thi **moi nhanh** deu
+scan ra `0 images, N corrupt` va training dung ngay -- ke ca nhanh goc `nearfar`. Da kiem
+tren may nay: `datasets_dir=/home/manhhv/AI/datasets` -> `nearfar` bao 3.349 corrupt.
+
+Cac checkpoint trong `runs/` duoc train khi cau hinh nay con dung. Nguoi clone repo se
+khong retrain duoc cho toi khi:
+
+    yolo settings datasets_dir="<duong dan tuyet doi toi goc repo>"
+
+`exp_data_scaling.py` khong phu thuoc cai dat nay: no ghi duong dan tuyet doi vao
+train.txt/valid.txt cua tap con, nen chay duoc du DATASETS_DIR tro dau.
