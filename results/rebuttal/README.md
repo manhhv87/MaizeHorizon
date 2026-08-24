@@ -1,7 +1,6 @@
 # `results/rebuttal/` — các phép đo bổ sung cho phản biện
 
-Mỗi mục ghi **lệnh đã chạy** để sinh ra CSV tương ứng. Đường dẫn dùng biến ở đầu
-`CLAUDE.md`:
+Mỗi mục ghi **lệnh đã chạy** để sinh ra CSV tương ứng. Các biến đường dẫn:
 
 ```bash
 PY=/home/manhhv/anaconda3/envs/MAAF-NET/bin/python
@@ -59,7 +58,8 @@ Kết quả: RT-DETR-l đạt nửa recall ở ~29–34 px gốc so với ~52 px
 → `M4_data_scaling.csv` + `M4_train_scale.csv`, `M4b_oversample_far.csv`, và với mỗi cái
 là `_eval.csv` / `_eval_curve.csv` do `eval_testset.py` sinh ở bước cuối.
 
-⚠️ `--workers 2`: mặc định 8 gây deadlock trên máy này (bẫy #5 trong `CLAUDE.md`).
+⚠️ `--workers 2`: mặc định 8 gây deadlock fork giữa OpenCV và DataLoader trên máy này —
+training đứng hẳn sau vài epoch, GPU 0%, không báo lỗi.
 
 ## M7 — phổ công suất của hai cảm biến
 

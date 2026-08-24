@@ -26,7 +26,8 @@ def main():
     ap.add_argument("--imgsz", type=int, default=1280)
     ap.add_argument("--batch", type=int, default=8)
     ap.add_argument("--workers", type=int, default=8,
-                    help="so worker dataloader; dat 2 neu train treo (xem bay #5 CLAUDE.md)")
+                    help="so worker dataloader. Dat 2 neu train dung han sau vai epoch voi "
+                         "GPU 0%% va khong bao loi: deadlock fork OpenCV/DataLoader.")
     ap.add_argument("--device", default="0")
     ap.add_argument("--name", default="distill_s0")
     ap.add_argument("--runs", default="runs", help="thu muc chua <name>/weights/best.pt")

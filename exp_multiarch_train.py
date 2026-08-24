@@ -55,7 +55,8 @@ def main():
     ap.add_argument("--epochs", type=int, default=200)
     ap.add_argument("--batch", type=int, default=8)
     ap.add_argument("--workers", type=int, default=8,
-                    help="so worker dataloader; dat 2 neu train treo (xem bay #5 CLAUDE.md)")
+                    help="so worker dataloader. Dat 2 neu train dung han sau vai epoch voi "
+                         "GPU 0%% va khong bao loi: deadlock fork OpenCV/DataLoader.")
     ap.add_argument("--patience", type=int, default=20)
     ap.add_argument("--device", default="0")
     ap.add_argument("--optimizer", default="auto",

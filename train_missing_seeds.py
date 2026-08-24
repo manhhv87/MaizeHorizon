@@ -23,7 +23,7 @@ train hom 22/08 cho val mAP50 nam trong dai cua seed 0-2 o ca hai nhanh.
 
 BAY 2 -- so worker. 8 worker mac dinh gay deadlock fork giua OpenCV va DataLoader tren
 may nay: train dung han sau vai epoch, GPU 0%, khong bao loi gi. Mac dinh o day la 2.
-Xem bay #5 trong CLAUDE.md.
+Dau hieu: `stat -c %y runs/<tag>/results.csv` khong doi trong nhieu phut ma GPU van 0%.
 """
 import argparse
 import csv

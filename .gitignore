@@ -210,6 +210,14 @@ __marimo__/
 data/
 *.zip
 
+# checkpoint: giu o may, KHONG day len git.
+# 75 checkpoint (15 nhanh x 5 seed) x 22 MB = 1,6 GB, vuot han muc LFS mien phi va
+# khong ai can chung de doc bai. Tai lap bang:
+#   python train_missing_seeds.py --seeds 0 1 2 3 4
+# Script tu doc batch/imgsz/patience tu runs/<tag>_s0/args.yaml neu con, hoac tu
+# bang cau hinh trong chinh no neu bat dau tu con so khong.
+runs/
+
 # COCO-pretrained weights: ultralytics downloads these automatically
 /yolov8s.pt
 /yolo11s.pt

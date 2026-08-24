@@ -418,8 +418,8 @@ baseline cua nhanh ha mau xuong 0.005, nen ca hai muc thay doi deu nho.
 
 # Lam lai o n=5 (22/08/2026)
 
-`stock` va `nearfar` nay co seed 3, 4 (xem bay #4 trong CLAUDE.md ve duong dan
-tuyet doi, va `train.py --workers` ve deadlock DataLoader). Cac lo chay lai:
+`stock` va `nearfar` nay co seed 3, 4 (duong dan trong train.txt phai TUYET DOI,
+va `--workers 2` de tranh deadlock DataLoader). Cac lo chay lai:
 
 ```bash
 # E4 hai nua, kem gia tri TUNG SEED de chay duoc phep kiem

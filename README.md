@@ -127,3 +127,38 @@ duplicated.
 Code is AGPL-3.0, inherited from
 [Ultralytics YOLO](https://github.com/ultralytics/ultralytics). The dataset is
 CC BY 4.0.
+
+## Checkpoint
+
+Trọng số **không** nằm trong repo. 75 checkpoint (15 nhánh × 5 seed) là ~1,6 GB, vượt
+hạn mức LFS miễn phí, và không cần để đọc bài. Dựng lại:
+
+```bash
+python train_missing_seeds.py --seeds 0 1 2 3 4 --workers 2 --device 0
+```
+
+Script dò nhánh nào thiếu seed và chỉ train phần thiếu, ghi
+`results/rebuttal/seed_manifest.csv` sau **mỗi** lượt. Siêu tham số của từng nhánh nằm
+trong bảng `ARMS` của chính script; nếu `runs/<tag>_s0/args.yaml` còn trên máy thì
+`batch`, `imgsz` và `patience` được đọc từ đó thay vì lấy bảng, để seed mới khớp seed cũ.
+
+⚠️ `--workers 2`: mặc định 8 gây deadlock fork giữa OpenCV và DataLoader trên một số máy —
+training đứng hẳn sau vài epoch, GPU 0%, không báo lỗi nào.
+
+⚠️ `best.pt` được ultralytics chọn theo fitness = `0.1·mAP50 + 0.9·mAP50-95`, và một cú
+nhiễu validation trong giai đoạn warmup có thể khiến nó chốt ở epoch 2 rồi dừng sớm. Đã
+gặp một lần: checkpoint mất 21% AP tầng giữa và 62% AP tầng xa mà không có dấu hiệu gì.
+Kiểm sau khi train:
+
+```bash
+python -c "import csv,sys;r=list(csv.DictReader(open(sys.argv[1])));\
+k50=[c for c in r[0] if 'mAP50(B)' in c and '95' not in c][0];\
+k95=[c for c in r[0] if 'mAP50-95(B)' in c][0];\
+v=[0.1*float(x[k50])+0.9*float(x[k95]) for x in r];\
+e=v.index(max(v))+1;print('best @epoch',e,'/',len(v),'<-- NGHI NGO' if e<=5 else '')" \
+  runs/<tag>_s<n>/results.csv
+```
+
+Toàn bộ CSV kết quả **có** trong repo, nên mọi con số trong bài kiểm chứng được mà không
+cần train lại. `python check_traceability.py --strict` xác nhận mỗi CSV truy được về một
+lệnh đã ghi.
