@@ -30,6 +30,11 @@ def main():
     ap.add_argument("--epochs", type=int, default=200)
     ap.add_argument("--patience", type=int, default=20)
     ap.add_argument("--batch", type=int, default=8)
+    ap.add_argument("--workers", type=int, default=8,
+                    help="so worker cua dataloader. Mac dinh 8 la mac dinh cua ultralytics, "
+                         "tuc gia tri da dung cho seed 0/1/2. Tren may nay 8 worker treo "
+                         "vo han sau vai epoch (futex_wait_queue, GPU 0%%): deadlock fork "
+                         "giua OpenCV va DataLoader. Dat 2 neu gap lai.")
     ap.add_argument("--lr0", type=float, default=0.01)
     ap.add_argument("--optimizer", default="auto")
     ap.add_argument("--device", default="0")
@@ -47,6 +52,7 @@ def main():
         print(f"\n========== train {name} ==========", flush=True)
         YOLO(a.model).train(
             data=data, epochs=a.epochs, patience=a.patience, imgsz=a.imgsz, batch=a.batch,
+            workers=a.workers,
             optimizer=a.optimizer, lr0=a.lr0, device=a.device, seed=seed,
             project=a.runs, name=name, exist_ok=True,
         )

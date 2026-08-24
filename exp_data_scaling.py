@@ -123,6 +123,8 @@ def main():
     ap.add_argument("--epochs", type=int, default=200)
     ap.add_argument("--patience", type=int, default=20)
     ap.add_argument("--batch", type=int, default=8)
+    ap.add_argument("--workers", type=int, default=8,
+                    help="chuyen thang cho train.py; xem ghi chu deadlock o do")
     ap.add_argument("--device", default="0")
     ap.add_argument("--runs", default="runs")
     ap.add_argument("--out")
@@ -150,7 +152,7 @@ def main():
                                 "--data", os.path.join(out_dir, "data.yaml"),
                                 "--seeds", str(sd), "--imgsz", str(a.imgsz),
                                 "--epochs", str(a.epochs), "--patience", str(a.patience),
-                                "--batch", str(a.batch), "--device", a.device,
+                                "--batch", str(a.batch), "--workers", str(a.workers), "--device", a.device,
                                 "--runs", a.runs], check=True)
         tags.append((tag, len(keep), float(a.oversample_far)))
         a.fracs = []
@@ -169,7 +171,7 @@ def main():
                                 "--data", os.path.join(arm_dir.replace(a.arm, tag), "data.yaml"),
                                 "--seeds", str(sd), "--imgsz", str(a.imgsz),
                                 "--epochs", str(a.epochs), "--patience", str(a.patience),
-                                "--batch", str(a.batch), "--device", a.device,
+                                "--batch", str(a.batch), "--workers", str(a.workers), "--device", a.device,
                                 "--runs", a.runs], check=True)
         tags.append((tag, n_, fr))
 

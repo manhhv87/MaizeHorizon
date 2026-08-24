@@ -21,7 +21,10 @@ LABELS_DIR = r"data/test/labels"   # thu muc *.txt TEST (DA them far moi)
 IMAGES_DIR = r"data/images"                # root anh test (tim de quy theo basename)
 RUNS       = "runs"                                         # <tag>_s<seed>/weights/best.pt
 DEVICE     = "0"                                            # GPU id, hoac "cpu"
-SEEDS      = [0, 1, 2]
+SEEDS      = [0, 1, 2]   # mac dinh; --seeds ghi de. stock/nearfar nay co them 3, 4.
+                         # Cac script eval deu loc theo checkpoint co that va ghi n_seeds
+                         # tung dong, nen truyen 0..4 cho ca lo la an toan: nhanh nao chi
+                         # co 3 seed thi van dung 3.
 IMGSZ      = 1280
 
 ARMS   = ["stock", "nearonly", "nearfar", "distill", "distill_shuffle", "distill_synth", "nwd"]  # eval_testset/eval_ap (nwd cho sec.res-scaling)
@@ -137,7 +140,13 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", default=None, help="run only these steps, e.g. multiarch,contrast")
     ap.add_argument("--dry", action="store_true", help="print the commands without running them")
+    ap.add_argument("--seeds", nargs="+", type=int, default=None,
+                    help="ghi de SEEDS o dau file, vd --seeds 0 1 2 3 4")
     a = ap.parse_args()
+    if a.seeds:
+        global SEEDS
+        SEEDS = a.seeds
+        print(f"[i] seeds = {SEEDS}")
     want = {x.strip() for x in a.only.split(",")} if a.only else None
 
     if not os.path.isdir(LABELS_DIR):

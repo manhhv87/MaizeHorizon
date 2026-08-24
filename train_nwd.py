@@ -23,6 +23,8 @@ def main():
     ap.add_argument("--imgsz", type=int, default=1280)
     ap.add_argument("--epochs", type=int, default=200)
     ap.add_argument("--batch", type=int, default=8)
+    ap.add_argument("--workers", type=int, default=8,
+                    help="so worker dataloader; dat 2 neu train treo (xem bay #5 CLAUDE.md)")
     ap.add_argument("--patience", type=int, default=20)
     ap.add_argument("--device", default="0")
     ap.add_argument("--seed", type=int, default=0)
@@ -58,7 +60,7 @@ def main():
         model.train(resume=True)
     else:
         model = YOLO(a.model)
-        model.train(data=a.data, epochs=a.epochs, imgsz=a.imgsz, batch=a.batch,
+        model.train(data=a.data, epochs=a.epochs, imgsz=a.imgsz, batch=a.batch, workers=a.workers,
                     device=a.device, seed=a.seed, deterministic=True, patience=a.patience,
                     optimizer="SGD", lr0=0.01, project=a.runs, name=name, exist_ok=True,
                     prune=False)   # fork tich hop torch-pruning; tat de train chuan (giong arm stock)

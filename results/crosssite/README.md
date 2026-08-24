@@ -375,3 +375,107 @@ khong retrain duoc cho toi khi:
 
 `exp_data_scaling.py` khong phu thuoc cai dat nay: no ghi duong dan tuyet doi vao
 train.txt/valid.txt cua tap con, nen chay duoc du DATASETS_DIR tro dau.
+
+---
+
+# E5 — Doi chung cat o "sach": 8K goc vs 8K DA HA MAU
+
+E4 so cat o giua HAI camera, nen ngoai cam bien con hai thu khac di kem: kich thuoc
+tile (640 vs 1280 px) va tran phat hien (1000 vs 3000). E5 bo ca hai bang cach so
+BEN TRONG bo 8K, giua khung goc va ban sao ha mau Lanczos xuong 1920x1080.
+
+Tile duoc chon de PHU CUNG MOT PHAN khung o ca hai nhanh: 1/6 be ngang.
+  7680 / 6 = 1280 px  (khung goc)
+  1920 / 6 =  320 px  (khung ha mau)
+Nho vay moi tile "nhin" cung mot phan canh, va thu duy nhat con khac la luong chi
+tiet cam bien giao ra.
+
+```bash
+DS=/media/manhhv/DATA/AI/_archive/paper2/test2_1080
+
+# nhanh goc: dung lai chinh lo E4 (hd_sahi.csv == E5_sahi_8k_native.csv)
+"$PY" exp_sahi_baseline.py --labels-dir "$LAB2" --images-dir "$IMG2" \
+  --runs runs --tag stock --seeds 0 1 2 --tile 1280 --imgsz 1280 --overlap 0.2 \
+  --iou 0.3 --conf 0.001 --max-det 3000 --device 0 \
+  --out results/crosssite/E5_sahi_8k_native.csv
+
+# nhanh ha mau
+"$PY" exp_sahi_baseline.py --labels-dir "$DS/labels" --images-dir "$DS/images" \
+  --runs runs --tag stock --seeds 0 1 2 --tile 320 --imgsz 1280 --overlap 0.2 \
+  --iou 0.3 --conf 0.001 --max-det 3000 --device 0 \
+  --out results/crosssite/E5_sahi_8k_ds1080.csv
+```
+
+| Tang xa (n=5.790) | full-frame | SAHI | Δ | tuong doi |
+|---|---|---|---|---|
+| 8K goc      | 0.0157 | 0.0382 | +0.0225 | **+143%** |
+| 8K ha mau   | 0.0053 | 0.0037 | −0.0016 | **−30%** |
+
+Huong song sot qua doi chung. Do lon thi khong: bo chi tiet cam bien cung keo
+baseline cua nhanh ha mau xuong 0.005, nen ca hai muc thay doi deu nho.
+
+---
+
+# Lam lai o n=5 (22/08/2026)
+
+`stock` va `nearfar` nay co seed 3, 4 (xem bay #4 trong CLAUDE.md ve duong dan
+tuyet doi, va `train.py --workers` ve deadlock DataLoader). Cac lo chay lai:
+
+```bash
+# E4 hai nua, kem gia tri TUNG SEED de chay duoc phep kiem
+"$PY" exp_sahi_baseline.py --labels-dir "$LAB" --images-dir "$IMG" \
+  --runs runs --tag nearfar --seeds 0 1 2 3 4 --tile 640 --overlap 0.2 --imgsz 1280 \
+  --iou 0.3 --conf 0.001 --device 0 \
+  --out results/baselines/sahi_ap_n5.csv \
+  --per-seed-out results/baselines/sahi_perseed_1080p_n5.csv
+
+"$PY" exp_sahi_baseline.py --labels-dir "$LAB2" --images-dir "$IMG2" \
+  --runs runs --tag stock --seeds 0 1 2 3 4 --tile 1280 --imgsz 1280 --overlap 0.2 \
+  --iou 0.3 --conf 0.001 --max-det 3000 --device 0 \
+  --out results/crosssite/hd_sahi_n5.csv \
+  --per-seed-out results/crosssite/hd_sahi_perseed_n5.csv
+
+# E5 nhanh ha mau
+"$PY" exp_sahi_baseline.py --labels-dir "$DS/labels" --images-dir "$DS/images" \
+  --runs runs --tag stock --seeds 0 1 2 3 4 --tile 320 --imgsz 1280 --overlap 0.2 \
+  --iou 0.3 --conf 0.001 --max-det 3000 --device 0 \
+  --out results/crosssite/E5_sahi_8k_ds1080_n5.csv \
+  --per-seed-out results/crosssite/E5_sahi_8k_ds1080_perseed_n5.csv
+
+# h50 tinh lai tu duong cong POT, chi dung bin n_gt >= 100 (KHONG doc h50_phys_px
+# cua _range.csv tren bo 8K -- xem canh bao o muc E4)
+"$PY" exp_h50_by_arch.py --prefix results/crosssite/hd_sweep --label "8K-n5" \
+  --min-n 100 --out results/crosssite/hd_h50_n5.csv
+
+# phep kiem: tung nua + phep kiem tuong tac
+"$PY" exp_seed5_stats.py \
+  --p1080 results/baselines/sahi_perseed_1080p_n5.csv \
+  --p8k   results/crosssite/hd_sahi_perseed_n5.csv \
+  --out   results/rebuttal/tiling_reversal_stats.csv
+
+# ngan sach giam sat o n=5 (train scale025/scale050 seed 3,4 roi danh gia lai)
+"$PY" exp_data_scaling.py --arm nearfar --fracs 0.25 0.5 --seeds 0 1 2 3 4 \
+  --labels-dir "$LAB" --images-dir "$IMG" --imgsz 1280 --epochs 200 --patience 20 \
+  --batch 8 --workers 2 --device 0 \
+  --out results/rebuttal/M4_data_scaling_n5.csv
+```
+
+⚠️ `exp_seed5_stats.py` bao cao ca `paired` lan `welch`. Ban trong bai (n=3) dung
+`welch` khong ghep cap; nhung `full` va `sahi` den tu CUNG mot checkpoint nen chung
+ghep cap tu nhien, va `paired` moi la phep kiem dung. Script in ca hai de doi chieu.
+
+
+---
+
+# File da bi thay the boi ban n=5 (2026-08-24)
+
+Ba file duoi day la ban 3 seed, giu lai de doi chieu. Ban dang dung la ban `_n5`:
+
+| ban cu (n=3)                          | ban dang dung (n=5)                       |
+|---------------------------------------|-------------------------------------------|
+| `hd_sahi.csv`                          | `hd_sahi_n5.csv`                          |
+| `E5_sahi_8k_native.csv`                | `hd_sahi_n5.csv` (cung mot lo chay)       |
+| `E5_sahi_8k_ds1080.csv`                | `E5_sahi_8k_ds1080_n5.csv`                |
+
+Con so trong ban thao lay tu ban `_n5`. Ban 3 seed cua moi ket qua khac nam o
+`results/n3_seed3_snapshot/`.

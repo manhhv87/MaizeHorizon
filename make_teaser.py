@@ -15,8 +15,13 @@ import numpy as np
 from eval_testset import read_gt
 
 IMGSZ = 1280
-# BGR
-COL = {"near": (60, 200, 60), "mid": (30, 140, 240), "far": (40, 40, 220)}
+# BGR. Okabe--Ito: an toan cho nguoi mu mau (khong dung truc do--luc) va ba mau
+# nay con khac nhau ve DO SANG, nen van tach duoc khi in den trang.
+#   near  #009E73 luc lam   mid  #E69F00 cam   far  #0072B2 lam
+COL = {"near": (115, 158, 0), "mid": (0, 159, 230), "far": (178, 114, 0)}
+# Be day giu deu: net day cho tang xa bi phong to trong o inset (nearest-neighbour)
+# thanh khoi che het cay. Ba mau tren da khac nhau ~12 don vi L*, du tach khi in xam.
+THICK = {"near": 2, "mid": 2, "far": 2}
 # Nhan theo ngon ngu, cho ban tieng Viet cua paper (paper/vi). Mac dinh 'en'
 # nen anh cua ban English khong doi.
 L10N = {
@@ -106,7 +111,7 @@ def main():
     for b in plants:
         t, _ = tier_of(b, W, H)
         counts[t] += 1
-        th = 3 if t == "near" else (2 if t == "mid" else 2)
+        th = THICK[t]
         cv2.rectangle(im, (int(b[0]), int(b[1])), (int(b[2]), int(b[3])), COL[t], th)
 
     # chon 1 near (cao nhat) + 1 far (thap nhat) lam inset

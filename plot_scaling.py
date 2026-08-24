@@ -21,14 +21,14 @@ L10N = {
            "titleA": "(A) Recall vs. pixels-on-target",
            "titleB": "(B) Recall vs. physical box height",
            "xlabelA": "Pixels-on-target (box height, px @ eval imgsz)",
-           "xlabelB": "Physical box height (px in original frame) -- smaller = farther",
+           "xlabelB": "Physical box height (px in original frame); smaller = farther",
            "ylabel": "Per-plant recall"},
     "vi": {"suptitle": "Recall theo chiều cao hộp gốc bằng phẳng trên đầu vào 960; "
                        "recall theo POT chỉ dịch chỗ",
            "titleA": "(A) Recall theo số điểm ảnh trên mục tiêu",
            "titleB": "(B) Recall theo chiều cao hộp gốc",
            "xlabelA": "Số điểm ảnh trên mục tiêu (chiều cao hộp, px @ imgsz đánh giá)",
-           "xlabelB": "Chiều cao hộp trong khung gốc (px) — nhỏ hơn = xa hơn",
+           "xlabelB": "Chiều cao hộp trong khung gốc (px); nhỏ hơn = xa hơn",
            "ylabel": "Recall theo từng cây"},
 }
 

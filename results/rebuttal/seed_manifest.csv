@@ -1,0 +1,2 @@
+tag,seed,script,seconds,returncode,best_pt
+nf960,4,train.py,2312.0,0,1

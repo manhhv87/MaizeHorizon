@@ -107,6 +107,8 @@ def main():
     ap.add_argument("--device", default="0")
     ap.add_argument("--plant-class", type=int, default=0)
     ap.add_argument("--out", default="results/detection/cluster_ci.csv")
+    ap.add_argument("--plants-out", default="results/dataset/distinct_plants.csv",
+                    help="bang box vs cay rieng biet; dat rong de bo qua")
     a = ap.parse_args()
 
     from ultralytics import YOLO
@@ -165,9 +167,19 @@ def main():
                 tier_plants[key].add(pid[i]); tier_boxes[key] += 1
     print("\n=== A2: box vs cay rieng biet ===")
     print(f"  {'tang':6s} {'box':>6s} {'cay':>6s} {'box/cay':>8s}")
+    prows = [["tier", "n_box", "n_plant", "boxes_per_plant"]]
     for t in TIERS:
         n_p = len(tier_plants[t]); n_b = tier_boxes[t]
         print(f"  {t:6s} {n_b:>6d} {n_p:>6d} {n_b/max(n_p,1):>8.2f}")
+        prows.append([t, n_b, n_p, round(n_b / max(n_p, 1), 2)])
+    # Dong "all" o day la so cay rieng biet TOAN BO, nho hon tong ba tang vi mot cay
+    # doi tang giua cac khung. Bai trich dung con so nay, nen no phai nam trong mot CSV
+    # chu khong chi in ra man hinh.
+    if a.plants_out:
+        os.makedirs(os.path.dirname(a.plants_out) or ".", exist_ok=True)
+        with open(a.plants_out, "w", newline="", encoding="utf-8") as f:
+            csv.writer(f).writerows(prows)
+        print(f"  -> {a.plants_out}")
 
     rows = []
     for tag in a.tags:
@@ -191,7 +203,12 @@ def main():
                 hits = match_gt_hits(gt, pred, a.iou)
                 sc = a.imgsz / max(w_img, h_img)
                 for i, gb in enumerate(gt):
-                    rec.append((tier_of((gb[3] - gb[1]) * sc), pid[i], clip, int(i in hits)))
+                    t_i = tier_of((gb[3] - gb[1]) * sc)
+                    hit = int(i in hits)
+                    # Ghi ca ban ghi "all" song song, neu khong thi vong lap ben duoi
+                    # loc theo r[0] == "all" se rong va dong tong bi bo qua im lang.
+                    rec.append((t_i, pid[i], clip, hit))
+                    rec.append(("all", pid[i], clip, hit))
             per_seed[s] = rec
             print(f"  {tag} s{s}: {len(rec)} boxes")
 

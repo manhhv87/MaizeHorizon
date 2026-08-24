@@ -46,8 +46,12 @@ def voc_ap(rec, prec):
     return float(np.sum((mrec[idx + 1] - mrec[idx]) * mpre[idx + 1]))
 
 
-def ap_tier(per_image, tier, iou_thr):
-    """per_image[i] = (gts, igs, preds); gts=[(box,tier)], preds=[(conf,box)]."""
+def ap_tier(per_image, tier, iou_thr, return_curve=False):
+    """per_image[i] = (gts, igs, preds); gts=[(box,tier)], preds=[(conf,box)].
+
+    return_curve=True tra them (recall, precision, conf) da sap theo conf giam dan,
+    de ve duong PR. Mac dinh False nen moi caller cu khong doi.
+    """
     all_preds = []  # (conf, img_idx, box)
     n_target = 0
     for i, (gts, igs, preds) in enumerate(per_image):
@@ -93,6 +97,8 @@ def ap_tier(per_image, tier, iou_thr):
     tpc = np.cumsum(tp); fpc = np.cumsum(fp)
     rec = tpc / n_target
     prec = tpc / np.maximum(tpc + fpc, 1e-9)
+    if return_curve:
+        return voc_ap(rec, prec), n_target, (rec, prec, np.array([c for c, _, _ in all_preds]))
     return voc_ap(rec, prec), n_target
 
 

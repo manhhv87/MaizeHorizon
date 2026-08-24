@@ -48,6 +48,11 @@ def main():
     ap.add_argument("--conf-confirm", type=float, default=0.4, help="confirm: max conf >= nguong")
     ap.add_argument("--tau", type=float, default=55.0, help="stem-base distance (px) below which two detections are the same plant")
     ap.add_argument("--min-overlap", type=int, default=1, help="minimum number of shared labelled frames for a match")
+    ap.add_argument("--out", default=None,
+                    help="noi them mot dong CSV cho lan chay nay (tao header neu file chua co). "
+                         "Khong co co nay thi ket qua chi nam o stdout va mat vet.")
+    ap.add_argument("--gate-label", default=None,
+                    help="nhan cho dong CSV, vd 3/0.4; mac dinh la min_frames/conf_confirm")
     ap.add_argument("--min-pot-reach", type=float, default=32.0,
                     help="count only tracks that reach this POT, i.e. plants that pass the resolvable near zone. "
                          "Nen KHOP min-pot-reach cua ledger de GT/pred cung scope.")
@@ -121,6 +126,26 @@ def main():
     print(f"  per-plant: P={prec:.3f}  R={rec:.3f}  F1={f1:.3f}   (TP={TP} FP={FP} FN={FN})")
     print(f"  Double-count(GT bi tach)={double}   Merge(pred om >1 GT)={merge}   tau={a.tau:.0f}px")
     print("\n  # a BEV re-association baseline should reduce both error and double counts.")
+
+    # Ket qua dem tung nam o stdout, nen bang count_gates.csv phai ghep tay tu cac file
+    # .log -- tuc con so trong bai khong truy duoc ve mot lenh. --out va cho do.
+    if a.out:
+        import csv as _csv
+        head = ["gate", "min_frames", "conf_confirm", "count_b1", "tp", "fp", "fn",
+                "precision", "recall", "f1", "double_count", "merged_tracks",
+                "n_gt_plants", "clip", "arm", "imgsz", "ledger"]
+        arm = os.path.basename(os.path.dirname(os.path.dirname(a.weights)))
+        row = [a.gate_label or f"{a.min_frames}/{a.conf_confirm}", a.min_frames, a.conf_confirm,
+               b1, TP, FP, FN, round(prec, 3), round(rec, 3), round(f1, 3), double, merge,
+               gt_count, led["clip"], arm, a.imgsz, os.path.basename(a.ledger)]
+        new = not os.path.exists(a.out)
+        os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
+        with open(a.out, "a", newline="", encoding="utf-8") as fh:
+            w = _csv.writer(fh)
+            if new:
+                w.writerow(head)
+            w.writerow(row)
+        print(f"  -> {a.out} (noi them 1 dong)")
 
 
 if __name__ == "__main__":

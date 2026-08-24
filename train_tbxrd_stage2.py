@@ -25,8 +25,11 @@ def main():
                     help="early stopping patience; keep it high for distillation")
     ap.add_argument("--imgsz", type=int, default=1280)
     ap.add_argument("--batch", type=int, default=8)
+    ap.add_argument("--workers", type=int, default=8,
+                    help="so worker dataloader; dat 2 neu train treo (xem bay #5 CLAUDE.md)")
     ap.add_argument("--device", default="0")
     ap.add_argument("--name", default="distill_s0")
+    ap.add_argument("--runs", default="runs", help="thu muc chua <name>/weights/best.pt")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--mint-root", default="data/mint")
     ap.add_argument("--frames-root", default="data/images")
@@ -47,7 +50,7 @@ def main():
 
     YOLO(a.weights).train(
         trainer=TBXRDDetectionTrainer, data=a.data, epochs=a.epochs, patience=a.patience, imgsz=a.imgsz,
-        batch=a.batch, device=a.device, name=a.name, seed=a.seed, project="runs",
+        batch=a.batch, workers=a.workers, device=a.device, name=a.name, seed=a.seed, project=a.runs,
         # geometric augmentation must be off so the far box stays aligned with its RoI
         mosaic=0.0, close_mosaic=0, mixup=0.0, copy_paste=0.0,
         fliplr=0.0, flipud=0.0, degrees=0.0, translate=0.0, scale=0.0, shear=0.0, perspective=0.0,

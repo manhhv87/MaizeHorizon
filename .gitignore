@@ -215,6 +215,11 @@ data/
 /yolo11s.pt
 /yolov10s.pt
 /rtdetr-l.pt
+/yolo11n.pt
+
+# ultralytics do rac vao day khi goi train/predict ma khong dat project+name
+# (vi du phep kiem AMP luc khoi dong). Khong thuoc duong tai lap ket qua.
+runs/detect/
 
 # fork ultralytics: KHONG commit ca fork (xem requirements.txt).
 # NGOAI LE: ba module viet rieng cho bai nay khong co trong ban ultralytics

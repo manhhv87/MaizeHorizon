@@ -54,6 +54,8 @@ def main():
     ap.add_argument("--imgsz", type=int, default=1280)
     ap.add_argument("--epochs", type=int, default=200)
     ap.add_argument("--batch", type=int, default=8)
+    ap.add_argument("--workers", type=int, default=8,
+                    help="so worker dataloader; dat 2 neu train treo (xem bay #5 CLAUDE.md)")
     ap.add_argument("--patience", type=int, default=20)
     ap.add_argument("--device", default="0")
     ap.add_argument("--optimizer", default="auto",
@@ -86,7 +88,7 @@ def main():
         resume = a.resume_tag is not None and os.path.exists(last)
         print(f"\n========== TRAIN {name} ==========")
         train_kwargs = dict(
-            data=a.data, epochs=a.epochs, imgsz=a.imgsz, batch=a.batch,
+            data=a.data, epochs=a.epochs, imgsz=a.imgsz, batch=a.batch, workers=a.workers,
             device=a.device, seed=seed, deterministic=True, patience=a.patience,
             optimizer=a.optimizer, project=a.runs, name=name, exist_ok=True,   # fork tich hop torch-pruning; PHAI tat (giong train.py cua repo)
         )

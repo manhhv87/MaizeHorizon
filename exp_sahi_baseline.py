@@ -141,6 +141,8 @@ def main():
     ap.add_argument("--ignore-class", type=int, default=1)
     ap.add_argument("--weight", default="best.pt", choices=["best.pt", "last.pt"])
     ap.add_argument("--out", default="sahi_ap.csv")
+    ap.add_argument("--per-seed-out", default=None,
+                    help="ghi them AP tho theo tung seed, de chay Welch/phep kiem tuong tac")
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args()
 
@@ -208,6 +210,20 @@ def main():
     with open(args.out, "w", newline="", encoding="utf-8") as f:
         csv.writer(f).writerows(rows)
     print(f"\n-> {args.out}")
+
+    # Ban tong hop chi giu mean/std, khong du de chay Welch hay phep kiem tuong tac
+    # giua hai bo du lieu. --per-seed-out ghi lai gia tri tho theo tung seed.
+    if args.per_seed_out:
+        pr = [["tag", "tier", "seed", "full_ap", "sahi_ap", "delta"]]
+        for s in STRATA:
+            for k, cp in enumerate(cps):
+                sd = os.path.basename(os.path.dirname(os.path.dirname(cp)))
+                pr.append([args.tag, s, sd, round(full[s][k], 6), round(sahi[s][k], 6),
+                           round(sahi[s][k] - full[s][k], 6)])
+        os.makedirs(os.path.dirname(args.per_seed_out) or ".", exist_ok=True)
+        with open(args.per_seed_out, "w", newline="", encoding="utf-8") as f:
+            csv.writer(f).writerows(pr)
+        print(f"-> {args.per_seed_out}  (gia tri tung seed)")
     print("# if SAHI far AP stays near zero, tiling and upscaling do not recover the far tier")
     print("#   which supports the sensor-limit reading: more sensor pixels, not more processing.")
 
