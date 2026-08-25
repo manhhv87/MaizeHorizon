@@ -1,0 +1,13 @@
+model,stratum,ap_unfiltered,ap_fp_size_filtered,n_seeds
+stock,near,0.9281,0.9345,5
+stock,mid,0.4578,0.6918,5
+stock,far,0.0197,0.3572,5
+nearfar,near,0.9481,0.9526,5
+nearfar,mid,0.4683,0.6817,5
+nearfar,far,0.016,0.2992,5
+distill,near,0.9074,0.9088,5
+distill,mid,0.2195,0.4844,5
+distill,far,0.0067,0.1707,5
+distill_shuffle,near,0.908,0.91,5
+distill_shuffle,mid,0.2484,0.5497,5
+distill_shuffle,far,0.0056,0.2121,5

@@ -72,7 +72,8 @@ def main():
             if not os.path.exists(ckpt):
                 print(f"[skip] {ckpt}"); continue
             per_image = predictions_for(ckpt, items, a)
-            val, n, (rec, prec, _) = ap_tier(per_image, a.tier, a.iou, return_curve=True)
+            val, n, (rec, prec, _) = ap_tier(per_image, a.tier, a.iou, return_curve=True,
+                                             fp_scale=a.imgsz / 1920.0)
             # precision bao hoa (monotone) roi noi suy len luoi recall chung
             pm = np.maximum.accumulate(prec[::-1])[::-1]
             per_seed.append((np.interp(grid, rec, pm, left=pm[0] if len(pm) else 0.0, right=0.0), val))
@@ -85,8 +86,11 @@ def main():
 
     import matplotlib
     matplotlib.use("Agg")
-    if a.lang != "en":
-        matplotlib.rcParams["pdf.fonttype"] = 42
+    # Type 42 (TrueType) cho CA HAI ngon ngu. Truoc day chi bat cho ban tieng Viet
+    # (de giu dau), nen ban tieng Anh nhung Type 3 vao PDF -- nhieu nha xuat ban
+    # tu choi Type 3, va chu trong hinh khong copy/tim kiem duoc.
+    matplotlib.rcParams["pdf.fonttype"] = 42
+    matplotlib.rcParams["ps.fonttype"] = 42
     import matplotlib.pyplot as plt
 
     # Okabe--Ito, an toan voi mu mau

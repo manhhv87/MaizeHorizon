@@ -9,7 +9,11 @@ imgsz/max(W,H)), and whether it was hit. Matching reuses eval_testset.py unchang
 Writes three files:
   <prefix>_pot.csv    recall vs POT, one curve per imgsz
   <prefix>_phys.csv   recall vs physical height, one curve per imgsz (paired: same bins, same n)
-  <prefix>_range.csv  h50, the physical height at 50% recall, per imgsz
+  <prefix>_range.csv  h50, the physical height at 50% recall, per imgsz.
+                      HAI cot: h50_phys_px khong loc bin thua, h50_phys_px_minn
+                      da bo bin duoi --h50-min-n nhan. BAO CAO cot thu hai.
+                      Tren bo 8K hai cot chenh 2.7 lan (26.67 vs 71.23 px) vi mot
+                      bin 11 cay o dau duong cong keo diem cat di.
   <prefix>_prec.csv   per-tier recall and ignore-aware precision, per imgsz
   <prefix>_physprec.csv  recall and precision in the same fixed native bins, so a recall gain
                       at one input size can be checked against what it costs in precision
@@ -124,10 +128,20 @@ def eval_one_imgsz(cps, items, imgsz, args):
             np.array(phys_prec))
 
 
-def h50(edges, rec_mean):
-    """Physical height at 50%% recall, linearly interpolated between bin midpoints."""
+def h50(edges, rec_mean, n_gt=None, min_n=0):
+    """Physical height at 50%% recall, linearly interpolated between bin midpoints.
+
+    `min_n` bo cac bin co duoi ngan ay nhan truoc khi noi suy. KHONG dat mac dinh 0
+    ma khong nghi: mot bin 11 cay o dau duong cong du de keo diem cat di gap ba lan.
+    Da dinh tren bo 8K -- cung mot lo chay cho h50 = 26.67 px khi khong loc va
+    71.23 px khi loc o min_n=100, tuc chenh 2.7 lan. Bao cao con so nao la mot lua
+    chon phai noi ro, khong duoc de nguoi doc tinh co doc phai cot sai.
+    """
     mids = [(edges[i] + (edges[i + 1] if np.isfinite(edges[i + 1]) else edges[i] + 32)) / 2
             for i in range(len(edges) - 1)]
+    if n_gt is not None and min_n > 0:
+        rec_mean = [r if (n_gt[i] or 0) >= min_n else float("nan")
+                    for i, r in enumerate(rec_mean)]
     prev_m, prev_r = None, None
     for m, r in zip(mids, rec_mean):
         if np.isnan(r):
@@ -156,6 +170,10 @@ def main():
     ap.add_argument("--plant-class", type=int, default=0)
     ap.add_argument("--ignore-class", type=int, default=1)
     ap.add_argument("--weight", default="best.pt", choices=["best.pt", "last.pt"])
+    ap.add_argument("--h50-min-n", type=int, default=100,
+                    help="bo bin co duoi ngan ay nhan khi noi suy h50. Cot h50_phys_px "
+                         "van la ban KHONG loc de doi chieu; cot h50_phys_px_minn moi la "
+                         "ban dung bao cao.")
     ap.add_argument("--out-prefix", default="scaling")
     args = ap.parse_args()
 
@@ -185,7 +203,8 @@ def main():
 
     pot_rows = [["imgsz", "pot_lo_px", "pot_hi_px", "n_gt", "recall_mean", "recall_std", "n_seeds"]]
     phys_rows = [["imgsz", "phys_lo_px", "phys_hi_px", "n_gt", "recall_mean", "recall_std", "n_seeds"]]
-    range_rows = [["imgsz", "h50_phys_px", "recall_near", "recall_mid", "recall_far", "n_seeds"]]
+    range_rows = [["imgsz", "h50_phys_px", "h50_phys_px_minn", "min_n", "n_bins_used",
+                   "recall_near", "recall_mid", "recall_far", "n_seeds"]]
     prec_rows = [["imgsz", "tier", "n_gt", "recall_mean", "recall_std",
                   "prec_mean", "prec_std", "n_seeds"]]
     physprec_rows = [["imgsz", "phys_lo_px", "phys_hi_px", "n_gt", "recall_mean", "recall_std",
@@ -215,7 +234,11 @@ def main():
         tmean = {s: float(np.nanmean([tr[s] for tr in tier_rec])) for s in STRATA}
         pmean = {s: float(np.nanmean([tp[s] for tp in tier_prec])) for s in STRATA}
         h_50 = h50(PHYS_EDGES, hm)
+        h_50f = h50(PHYS_EDGES, hm, phys_n, args.h50_min_n)
+        n_used = int(sum(1 for x in phys_n if (x or 0) >= args.h50_min_n))
         range_rows.append([imgsz, round(h_50, 2) if np.isfinite(h_50) else "nan",
+                           round(h_50f, 2) if np.isfinite(h_50f) else "nan",
+                           args.h50_min_n, n_used,
                            round(tmean["near"], 4), round(tmean["mid"], 4), round(tmean["far"], 4), len(cps)])
         for s in STRATA:
             prec_rows.append([imgsz, s, tier_n[s],

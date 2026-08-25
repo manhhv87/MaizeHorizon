@@ -479,3 +479,28 @@ Ba file duoi day la ban 3 seed, giu lai de doi chieu. Ban dang dung la ban `_n5`
 
 Con so trong ban thao lay tu ban `_n5`. Ban 3 seed cua moi ket qua khac nam o
 `results/n3_seed3_snapshot/`.
+
+## Bản chạy lại theo chuẩn COCO (`*_fpfilt.csv`)
+
+`eval_ap.py` nay lọc kích thước cho false positive và tích phân 101 điểm đúng chuẩn COCO
+(xem `results/baselines/README.md`), nên nửa 8K của phép đảo dấu và đối chứng E5 chạy lại
+với `--fp-size-filter`.
+
+```bash
+# Nửa 8K của phép đảo dấu
+"$PY" exp_sahi_baseline.py --labels-dir "$LAB2" --images-dir "$IMG2" --runs runs \
+  --tag stock --seeds 0 1 2 3 4 --tile 1280 --imgsz 1280 --overlap 0.2 \
+  --iou 0.3 --conf 0.001 --max-det 3000 --device 0 --fp-size-filter \
+  --out results/crosssite/hd_sahi_n5_fpfilt.csv \
+  --per-seed-out results/crosssite/hd_sahi_perseed_n5_fpfilt.csv
+
+# Đối chứng E5, nhánh hạ mẫu (nhánh gốc dùng lại chính lô trên)
+DS=/media/manhhv/DATA/AI/_archive/paper2/test2_1080
+"$PY" exp_sahi_baseline.py --labels-dir "$DS/labels" --images-dir "$DS/images" --runs runs \
+  --tag stock --seeds 0 1 2 3 4 --tile 320 --imgsz 1280 --overlap 0.2 \
+  --iou 0.3 --conf 0.001 --max-det 3000 --device 0 --fp-size-filter \
+  --out results/crosssite/E5_sahi_8k_ds1080_n5_fpfilt.csv \
+  --per-seed-out results/crosssite/E5_sahi_8k_ds1080_perseed_n5_fpfilt.csv
+```
+
+Tầng xa 8K: 0,193 → 0,478 (+148%). Cùng chiều bản cũ nhưng lớn hơn nhiều.

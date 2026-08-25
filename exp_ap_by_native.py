@@ -24,7 +24,7 @@ import os
 
 import numpy as np
 
-from eval_ap import ap_tier, box_iou, in_any, voc_ap  # noqa: F401
+from eval_ap import ap_tier, box_iou, in_any, coco_ap  # noqa: F401
 from eval_testset import read_gt, build_image_index, sstd
 
 PHYS_EDGES = [16.0, 24.0, 32.0, 48.0, 64.0, 96.0, 128.0, 192.0, float("inf")]
@@ -107,7 +107,7 @@ def main():
                 continue
             pi = predictions_native(YOLO(wp), items, imgsz, a)
             for b in bins:
-                v, n = ap_tier(pi, b, a.iou)
+                v, n = ap_tier(pi, b, a.iou, fp_scale=a.imgsz / 1920.0)
                 per_seed[b].append(v)
                 n_gt[b] = n
         table[imgsz] = (per_seed, n_gt)

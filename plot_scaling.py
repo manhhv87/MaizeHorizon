@@ -71,10 +71,11 @@ def main():
 
     import matplotlib
     matplotlib.use("Agg")
-    if a.lang != "en":
-        # Type 3 chi mang duoc 256 ky tu -> dau tieng Viet khong trich xuat duoc.
-        # Type 42 (TrueType) nhung nguyen font nen chu van copy/tim kiem duoc.
-        matplotlib.rcParams["pdf.fonttype"] = 42
+    # Type 42 (TrueType) cho CA HAI ngon ngu. Truoc day chi bat cho ban tieng Viet
+    # (de giu dau), nen ban tieng Anh nhung Type 3 vao PDF -- nhieu nha xuat ban
+    # tu choi Type 3, va chu trong hinh khong copy/tim kiem duoc.
+    matplotlib.rcParams["pdf.fonttype"] = 42
+    matplotlib.rcParams["ps.fonttype"] = 42
     import matplotlib.pyplot as plt
 
     pot = load(f"{a.prefix}_pot.csv")

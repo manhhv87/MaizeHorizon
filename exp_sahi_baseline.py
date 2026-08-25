@@ -141,6 +141,8 @@ def main():
     ap.add_argument("--ignore-class", type=int, default=1)
     ap.add_argument("--weight", default="best.pt", choices=["best.pt", "last.pt"])
     ap.add_argument("--out", default="sahi_ap.csv")
+    ap.add_argument("--fp-size-filter", action="store_true",
+                    help="chi tinh FP cua mot tang khi prediction thuoc tang do (kieu COCO)")
     ap.add_argument("--per-seed-out", default=None,
                     help="ghi them AP tho theo tung seed, de chay Welch/phep kiem tuong tac")
     ap.add_argument("--selftest", action="store_true")
@@ -192,8 +194,14 @@ def main():
         per_s = sahi_per_image(cp, items, args)
         per_f = predictions_for(cp, items, fa)
         for s in STRATA:
-            a_s, ng = ap_tier(per_s, s, args.iou)
-            a_f, _ = ap_tier(per_f, s, args.iou)
+            # fp_scale: chi tinh mot prediction la false positive cua tang dang xet
+            # khi chinh no thuoc tang do (kieu COCO). Khong co no, 88,6% FP tinh vao
+            # AP tang xa lai la box co kich thuoc tang gan, nen AP tang xa do box lon
+            # doan sai chu khong do chat luong phat hien cay xa -- va cat o sinh rat
+            # nhieu box lon doan sai, dung o bien o.
+            fps = (IMGSZ_REF / 1920.0) if args.fp_size_filter else None
+            a_s, ng = ap_tier(per_s, s, args.iou, fp_scale=fps)
+            a_f, _ = ap_tier(per_f, s, args.iou, fp_scale=fps)
             sahi[s].append(a_s); full[s].append(a_f)
             if ngt is None or s not in (ngt or {}):
                 pass

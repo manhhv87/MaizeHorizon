@@ -53,6 +53,18 @@ def fmt(v, nd, lang):
     return s.replace(".", "{,}") if lang == "vi" else s
 
 
+def contains(text, needle):
+    """Tim `needle` nhung KHONG cho no nam long trong mot so dai hon.
+
+    Bay da dinh: so sanh chuoi con lam "0.93" khop voi "0.931" trong ban thao,
+    nen mot bang con nguyen so cu van bao dat. Chan bang cach doi hai dau khong
+    duoc la chu so (hoac dau thap phan tiep theo).
+    """
+    esc = re.escape(needle)
+    pat = r"(?<![\d.,])" + esc + r"(?![\d]|\{,\}|\.\d)"
+    return re.search(pat, text) is not None
+
+
 # --- REGISTRY -----------------------------------------------------------------
 # (nhan, duong dan CSV, dieu kien chon dong, cot, nd[, ctx])
 #   nd  : so chu so thap phan; co the la tuple neu ban thao lam tron manh hon CSV
@@ -85,17 +97,59 @@ CHECKS = [
     ("1080p h50 @1280", "results/scaling/scaling_range.csv",
      dict(imgsz="1280"), "h50_phys_px", (1, 0), "${v}$\\,px"),
 
-    # --- AP theo tang, IoU 0.3 (Bang tab:detection)
+    # --- AP theo tang, IoU 0.3 (Bang tab:detection). Bang in 3 chu so thap phan;
+    # kiem o 2 chu so tung cho khop nham vi "0.93" nam long trong "0.931".
     ("AP stock near", "results/detection/testset_ap03.csv",
-     dict(model="stock", stratum="near"), "ap_mean", 2),
+     dict(model="stock", stratum="near"), "ap_mean", 3),
+    ("AP stock far", "results/detection/testset_ap03.csv",
+     dict(model="stock", stratum="far"), "ap_mean", 3),
     ("AP nearfar mid", "results/detection/testset_ap03.csv",
-     dict(model="nearfar", stratum="mid"), "ap_mean", 2),
+     dict(model="nearfar", stratum="mid"), "ap_mean", 3),
+    ("AP distill far", "results/detection/testset_ap03.csv",
+     dict(model="distill", stratum="far"), "ap_mean", 3),
+    # --- tran recall theo tang (Bang tab:cliff)
+    ("cliff stock far ceiling", "results/detection/testset_ceiling.csv",
+     dict(model="stock", stratum="far"), "recall_mean", 3),
+    ("cliff distill far @0.25", "results/detection/testset_iou03.csv",
+     dict(model="distill", stratum="far"), "recall_mean", 3),
+    # --- da kien truc (Bang tab:multiarch)
+    ("multiarch rtdetr far", "results/baselines/rebuttal_multiarch.csv",
+     dict(arch="rtdetr-l", stratum="far"), "recall_mean", 3),
+    ("multiarch yolo11s ceiling", "results/baselines/rebuttal_multiarch_far_ceiling.csv",
+     dict(arch="yolo11s"), "far_recall_ceiling", 3),
 
     # --- phep dao dau cat o (Muc res-tiling)
-    ("tiling 8K full AP", "results/crosssite/hd_sahi_n5.csv",
-     dict(tier="far"), "full_ap_mean", 4),
-    ("tiling 8K sahi AP", "results/crosssite/hd_sahi_n5.csv",
-     dict(tier="far"), "sahi_ap_mean", 4),
+    # Tro vao ban _fpfilt: eval_ap.py nay loc kich thuoc cho false positive dung
+    # chuan COCO, nen moi AP theo tang doi so. Ban khong loc van con tren dia de
+    # doi chieu, nhung bai KHONG trich dan no nua.
+    ("tiling 8K full AP", "results/crosssite/hd_sahi_n5_fpfilt.csv",
+     dict(tier="far"), "full_ap_mean", 3),
+    ("tiling 8K sahi AP", "results/crosssite/hd_sahi_n5_fpfilt.csv",
+     dict(tier="far"), "sahi_ap_mean", 3),
+    ("tiling 1080p full AP", "results/baselines/sahi_ap_n5_fpfilt.csv",
+     dict(tier="far"), "full_ap_mean", 3),
+    ("tiling 1080p sahi AP", "results/baselines/sahi_ap_n5_fpfilt.csv",
+     dict(tier="far"), "sahi_ap_mean", 3),
+    ("tiling 8K near AP sau cat o", "results/crosssite/hd_sahi_n5_fpfilt.csv",
+     dict(tier="near"), "sahi_ap_mean", 3),
+
+    # --- diem gay cua quy luat min (M8, muc sec:res-native)
+    ("h50 stock 1920 vs 960", "results/rebuttal/M8_h50_crossover.csv",
+     dict(conf="0.25", tag_a="stock", imgsz_a="1920", imgsz_b="960"), "delta", 2),
+    ("h50 nearfar 1920 vs 960", "results/rebuttal/M8_h50_crossover.csv",
+     dict(conf="0.25", tag_a="nearfar", imgsz_a="1920", imgsz_b="960"), "delta", 2),
+    ("h50 stock tren goc 2560", "results/rebuttal/M8_h50_crossover.csv",
+     dict(conf="0.001", tag_a="stock", imgsz_a="2560"), "delta", 2),
+    ("h50 nwd tren goc 2560", "results/rebuttal/M8_h50_crossover.csv",
+     dict(conf="0.001", tag_a="nwd", imgsz_a="2560"), "delta", 2),
+    ("h50 nwd so voi stock", "results/rebuttal/M8_h50_crossover.csv",
+     dict(conf="0.25", tag_a="nwd", tag_b="stock"), "delta", 2),
+
+    # --- NWD la biet le duong, khong con la ket qua am
+    ("AP nwd far", "results/detection/testset_ap03.csv",
+     dict(model="nwd", stratum="far"), "ap_mean", 3),
+    ("AP nwd mid", "results/detection/testset_ap03.csv",
+     dict(model="nwd", stratum="mid"), "ap_mean", 3),
 
     # --- ngan sach giam sat (Bang tab:supervision)
     ("supervision scale025 far", "results/rebuttal/M4_data_scaling.csv",
@@ -180,7 +234,8 @@ def main():
             miss += 1
             continue
         cands = [fmt(r[col], k, a.lang) for k in nds]
-        hits = [c for c in cands if (ctx.replace("{v}", c) if ctx else c) in text]
+        hits = [c for c in cands
+                if (ctx.replace("{v}", c) in text if ctx else contains(text, c))]
         if hits:
             ok += 1
         else:

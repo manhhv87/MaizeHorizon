@@ -65,3 +65,21 @@ done
 ⚠️ `rerun_after_relabel.py` **bo qua** buoc nay tru khi dat bien `BURST` o dau file
 (mac dinh `None`), vi no can duong dan toi thu muc khung lien tiep cua tung clip.
 Kiem `--frames-dir` khop bo cuc thu muc anh hien tai truoc khi chay.
+
+## `sahi_ap_n5_fpfilt.csv` — bản chạy lại theo chuẩn COCO
+
+Sau khi `eval_ap.py` chuyển sang đúng chuẩn COCO (lọc kích thước cho false positive +
+tích phân 101 điểm), mọi AP theo tầng đổi số, nên nửa 1080p của phép đảo dấu phải chạy lại.
+Cờ `--fp-size-filter` bật đúng luật COCO: dự đoán không khớp mà **nằm ngoài** dải kích
+thước của tầng thì bị bỏ qua, không tính là false positive. Thiếu luật này thì AP tầng xa
+đếm cả những dự đoán cỡ gần — đo được 88,6% false positive tầng xa là box cỡ near.
+
+```bash
+"$PY" exp_sahi_baseline.py --labels-dir "$LAB" --images-dir "$IMG" --runs runs \
+  --tag nearfar --seeds 0 1 2 3 4 --tile 640 --overlap 0.2 --imgsz 1280 \
+  --iou 0.3 --conf 0.001 --device 0 --fp-size-filter \
+  --out results/baselines/sahi_ap_n5_fpfilt.csv \
+  --per-seed-out results/baselines/sahi_perseed_1080p_n5_fpfilt.csv
+```
+
+Hiệu ứng lớn hơn hẳn bản cũ: tầng xa 0,299 → 0,092 (−69%), so với chênh lệch nhỏ trước đây.

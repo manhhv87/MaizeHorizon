@@ -164,3 +164,169 @@ chấm lại đúng 66 cây đó, nên phương sai giữa seed đo lần chạy
 Hai khoảng chồng nhau trên phần lớn độ dài; mỗi khoảng rộng gấp ~2 lần con số 0,107 ngăn cách
 hai trung bình. Bài vì thế báo cáo **không có hiệu ứng** của kích thước tập huấn luyện, chứ
 không phải hiệu ứng nghịch.
+
+## Khoảng tin cậy cho h50
+
+`h50` là đại lượng trung tâm của bài nhưng trước giờ chỉ báo một con số điểm, nên không trả
+lời được câu hỏi hiển nhiên nhất: chênh 1,7 px giữa input 960 và 1920 có phân biệt được với
+0 không.
+
+```bash
+"$PY" exp_h50_ci.py --labels-dir "$LAB" --images-dir "$IMG" --runs runs \
+  --tag nearfar --seeds 0 1 2 3 4 --imgsz-list 640 960 1280 1920 \
+  --iou 0.3 --conf 0.25 --max-det 1000 --boot 2000 --device 0 \
+  --out results/scaling/h50_ci.csv
+```
+
+| imgsz | h50 | theo cây (95%) | theo clip (95%) |
+|---|---|---|---|
+| 640 | 59,87 | [57,24 – 62,06] | [55,50 – 64,25] |
+| 960 | 52,95 | [51,68 – 54,52] | [52,19 – 54,35] |
+| 1280 | 51,90 | [50,59 – 53,35] | [50,80 – 53,04] |
+| 1920 | 51,26 | [50,00 – 52,63] | [49,02 – 53,19] |
+
+Đơn vị lấy mẫu lại là **cây**, không phải hộp (một cây cho 3,6 hộp ở tầng gần nên coi chúng
+độc lập sẽ thu hẹp khoảng giả tạo) và không phải seed (mọi seed chấm lại đúng những cây ấy,
+nên phương sai giữa seed đo lần chạy chứ không đo mẫu).
+
+Đọc: 640 và 960 **không giao nhau** → bước đó là thật.
+
+⚠️ **Cách đọc cũ ở đây là sai, đã thay bằng M8.** Trước đây mục này kết luận "960 và 1920
+chồng nhau gần hết → không phân giải được", rồi bài dùng nó để khẳng định đầu vào không thêm
+gì trên 960. Hai khoảng biên chồng nhau **không** chứng minh hai giá trị bằng nhau. Bootstrap
+ghép cặp chính hiệu số (M8) cho −1,69 px [−2,48, −0,96] p=0,0005 trên chính nhánh này, và
+−5,66 px trên `stock`. Bước 960→1920 là thật; điểm gãy nằm ở **độ phân giải gốc**, không phải
+ở 960. Xem mục M8 bên dưới.
+
+---
+
+## M8 — Điểm gãy của quy luật min nằm ở độ phân giải gốc
+
+`exp_h50_contrast.py` → `M8_h50_*.csv`, gộp ở `M8_h50_crossover.csv`
+
+Hai khoảng tin cậy chồng nhau **không** chứng minh hai giá trị bằng nhau — đó là lỗi đọc
+khoảng phổ biến nhất, và bảng `h50_ci.csv` ở trên rơi đúng vào nó. Phép đúng là bootstrap
+chính **hiệu số** trên cùng một lần lấy mẫu lại: cây nào vào mẫu thì vào cho cả hai vế, nên
+phương sai chung do mẫu bị khử và khoảng hẹp hơn hẳn khoảng của từng vế.
+
+Chạy ở **hai ngưỡng**: `conf=0.25` là điểm vận hành của bài, nhưng `h50` ở đó trộn lẫn khả
+năng phát hiện với hiệu chuẩn điểm số. `conf=0.001` là trần, gần như mọi dự đoán đều qua
+ngưỡng, nên đo khả năng phát hiện gần như thuần tuý. Kết luận chỉ chắc khi hiệu số còn ở cả hai.
+
+```bash
+C="--labels-dir $LAB --images-dir $IMG --runs runs --seeds 0 1 2 3 4 --device 0 --boot 2000"
+
+# Dưới mức gốc: thêm điểm ảnh đầu vào có dời sàn không
+"$PY" exp_h50_contrast.py $C --tag-a stock   --tag-b stock   --imgsz-a 1920 --imgsz-b 960 \
+  --out results/rebuttal/M8_h50_stock_1920v960.csv
+"$PY" exp_h50_contrast.py $C --tag-a nearfar --tag-b nearfar --imgsz-a 1920 --imgsz-b 960 \
+  --out results/rebuttal/M8_h50_nearfar_1920v960.csv
+
+# Trên mức gốc: nếu cảm biến ấn định sàn thì h50 phải phẳng sau 1920
+"$PY" exp_h50_contrast.py $C --tag-a stock   --tag-b stock   --imgsz-a 2560 --imgsz-b 1920 \
+  --out results/rebuttal/M8_h50_stock_2560v1920.csv
+"$PY" exp_h50_contrast.py $C --tag-a stock   --tag-b stock   --imgsz-a 3840 --imgsz-b 1920 \
+  --out results/rebuttal/M8_h50_stock_3840v1920.csv
+"$PY" exp_h50_contrast.py $C --tag-a nwd     --tag-b nwd     --imgsz-a 2560 --imgsz-b 1920 \
+  --out results/rebuttal/M8_h50_nwd_2560v1920.csv
+"$PY" exp_h50_contrast.py $C --tag-a nearfar --tag-b nearfar --imgsz-a 2560 --imgsz-b 1920 \
+  --out results/rebuttal/M8_h50_nearfar_2560v1920.csv
+
+# Đổi hàm mất mát có dời sàn không (nwd và stock cùng pool dữ liệu)
+"$PY" exp_h50_contrast.py $C --tag-a nwd --tag-b stock --imgsz 1280 \
+  --out results/rebuttal/M8_h50_nwd_vs_stock.csv
+```
+
+Quét đầu vào **vượt** mức gốc, chưa từng chạy trước đây:
+
+```bash
+"$PY" exp_resolution_sweep.py --labels-dir "$LAB" --images-dir "$IMG" --runs runs \
+  --tag stock --seeds 0 1 2 3 4 --imgsz-list 1920 2560 3840 --iou 0.3 --conf 0.25 \
+  --h50-min-n 100 --device 0 --out-prefix results/rebuttal/M8_stock_above
+```
+
+Và quét đầy đủ cho hai nhánh chưa có, để `nearfar` không còn là nhánh duy nhất chống đỡ C1:
+
+```bash
+"$PY" exp_resolution_sweep.py --labels-dir "$LAB" --images-dir "$IMG" --runs runs \
+  --tag stock --seeds 0 1 2 3 4 --imgsz-list 640 960 1280 1920 --iou 0.3 --conf 0.25 \
+  --h50-min-n 100 --device 0 --out-prefix results/rebuttal/M8_stock_sweep
+"$PY" exp_h50_ci.py --labels-dir "$LAB" --images-dir "$IMG" --runs runs \
+  --tag stock --seeds 0 1 2 3 4 --imgsz-list 1280 --iou 0.3 --conf 0.25 --max-det 1000 \
+  --boot 2000 --device 0 --out results/rebuttal/M8_stock_h50_ci.csv
+
+"$PY" exp_resolution_sweep.py --labels-dir "$LAB" --images-dir "$IMG" --runs runs \
+  --tag nwd --seeds 0 1 2 3 4 --imgsz-list 640 960 1280 1920 --iou 0.3 --conf 0.25 \
+  --h50-min-n 100 --device 0 --out-prefix results/rebuttal/M8_nwd_sweep
+"$PY" exp_h50_ci.py --labels-dir "$LAB" --images-dir "$IMG" --runs runs \
+  --tag nwd --seeds 0 1 2 3 4 --imgsz-list 1280 --iou 0.3 --conf 0.25 --max-det 1000 \
+  --boot 2000 --device 0 --out results/rebuttal/M8_nwd_h50_ci.csv
+```
+
+Gộp bảy phép tương phản trên thành một bảng để bài trích dẫn một chỗ:
+
+```bash
+"$PY" collect_h50_crossover.py --out results/rebuttal/M8_h50_crossover.csv
+```
+
+### `h50` (px gốc) theo đầu vào, ba nhánh, conf 0,25
+
+| imgsz | stock | nwd | nearfar |
+|---|---|---|---|
+| 640 | 56,64 | 52,69 | 59,87 |
+| 960 | 49,75 | 45,88 | 52,95 |
+| 1280 | 47,11 | 42,13 | 51,90 |
+| **1920 (gốc)** | **44,08** | **39,18** | **51,26** |
+| 2560 | 49,74 | 42,57 | 51,86 |
+| 3840 | 68,29 | — | — |
+
+### Đọc
+
+**Dưới mức gốc, đầu vào dời sàn thật.** Ghép cặp ở conf 0,25: `stock` 960→1920 cho
+−5,66 px [−6,97, −4,61] p=0,0005; `nearfar` cho −1,69 px [−2,48, −0,96] p=0,0005. Cả hai
+đều khác 0. Câu "đầu vào ≥960 không thêm gì" trong bản thảo là **sai** — nó rút ra từ chỗ
+hai khoảng biên chồng nhau, mà chồng nhau thì không kết luận được gì.
+
+**Hiệu ứng phụ thuộc nhánh, và bài đã chọn nhánh yếu nhất.** Mọi `scaling_*.csv` chạy
+`--tag nearfar`, nhánh cho hiệu ứng nhỏ nhất trong ba. Trên `stock` hiệu ứng lớn gấp 3,3 lần.
+Bình nguyên là tính chất của +Mint, không phải của cảm biến 1080p.
+
+**Trên mức gốc, đầu vào hết tác dụng.** Tại trần, không nhánh nào cải thiện: `stock` +0,81
+[−0,04, +1,56] ns; `nwd` +0,06 [−0,22, +0,42] ns; `nearfar` +2,79 [+0,40, +8,23] **xấu đi**.
+Ở điểm vận hành còn hỏng nặng hơn (`stock` h50 44 → 68 px ở 3840) vì lệch thang train–test.
+Đây là quy luật min ở dạng sắc nhất bài có được: điểm gãy nằm ở **độ phân giải gốc**, một mốc
+vật lý, chứ không phải con số 960. Trên 8K, đầu vào 2560 vẫn còn xa mức gốc 7680 nên recall
+còn tăng — hoàn toàn nhất quán.
+
+**NWD dời sàn thật.** `nwd` và `stock` dùng chung `pool_stock_split` (docstring
+`train_nwd.py` ghi `nearfar` nhưng lệnh đã chạy dùng stock), nên chỉ hàm mất mát khác nhau.
+Hiệu số −4,98 px [−6,18, −4,01] p=0,0005 ở conf 0,25, còn −2,36 px [−3,54, −0,20] p=0,040 ở
+trần. Còn ở cả hai ngưỡng → không phải hiệu chuẩn. Việc này không phá C1 (sàn vẫn bị cảm biến
+chặn, NWD chỉ trích được nhiều hơn từ cùng số điểm ảnh) nhưng NWD không còn là kết quả âm.
+
+## `*_stats_fpfilt.csv` — phép kiểm cho phép đảo dấu, sau khi chuyển sang COCO
+
+Tính lại từ các CSV từng seed đã chạy với `--fp-size-filter`.
+
+```bash
+"$PY" exp_seed5_stats.py \
+  --p1080 results/baselines/sahi_perseed_1080p_n5_fpfilt.csv \
+  --p8k   results/crosssite/hd_sahi_perseed_n5_fpfilt.csv \
+  --tier far --out results/rebuttal/tiling_reversal_stats_fpfilt.csv
+
+"$PY" exp_seed5_stats.py \
+  --p1080 results/crosssite/E5_sahi_8k_ds1080_perseed_n5_fpfilt.csv \
+  --p8k   results/crosssite/hd_sahi_perseed_n5_fpfilt.csv \
+  --tier far --label-1080 "8K ha mau (tile 320)" --label-8k "8K goc (tile 1280)" \
+  --out results/rebuttal/E5_control_stats_fpfilt.csv
+```
+
+| | Δ AP tầng xa | t | p |
+|---|---|---|---|
+| 1080p (cảm biến ràng buộc) | −0,207 | −10,16 | 0,001 |
+| 8K (đầu vào ràng buộc) | +0,285 | +17,50 | <0,001 |
+| **tương tác** | **+0,492** | **18,87** | **<0,001** |
+| đối chứng E5 (cùng cảnh, cùng thang ô) | **+0,361** | **16,26** | **<0,001** |
+
+Cả hai nửa nay đều dứt khoát, kể cả nửa 1080p vốn nằm sát ngưỡng ở bản cũ. Hiệu ứng lớn
+hơn bản cũ khoảng 15 lần về trị tuyệt đối.

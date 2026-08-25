@@ -138,9 +138,14 @@ def main():
         # point estimate = mean recall over seeds, but the Wilson interval uses the true n.
         # Pooling seeds over the same far set would be pseudo-replication and shrink the CI ~3x.
         mean_far = far_tp_tot / (far_n_ref * len(cps)) if far_n_ref else float("nan")
-        p, lo, hi = wilson(int(round(mean_far * far_n_ref)), far_n_ref)
-        far_rows.append([tag, round(p, 4), round(lo, 4), round(hi, 4), far_n_ref, len(cps)])
-        print(f"  FAR recall @ceiling(conf={a.conf_ceiling}) = {p:.4f}  "
+        # Wilson can mot so dem nguyen, nen phai lam tron so TP trung binh de dung no.
+        # Nhung BAO CAO phai la `mean_far`, khong phai diem uoc luong cua Wilson: lam
+        # tron 27.6 -> 28 keo 0.3366 thanh 0.3415, va do dung la cho tung khien bang
+        # nay lech voi eval_testset mot cach khong giai thich duoc.
+        _, lo, hi = wilson(int(round(mean_far * far_n_ref)), far_n_ref)
+        far_rows.append([tag, round(mean_far, 4), round(lo, 4), round(hi, 4),
+                         far_n_ref, len(cps)])
+        print(f"  FAR recall @ceiling(conf={a.conf_ceiling}) = {mean_far:.4f}  "
               f"Wilson95%=[{lo:.4f},{hi:.4f}]  (far N/seed={far_n_ref}, seeds={len(cps)})")
 
     with open(a.out, "w", newline="", encoding="utf-8") as f:

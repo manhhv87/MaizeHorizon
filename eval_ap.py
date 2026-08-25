@@ -3,9 +3,23 @@
 """Per-tier AP (near/mid/far/all) on the hand-labelled test set.
 
 Unlike eval_testset.py, this integrates the full precision-recall curve, so it does not depend
-on a single operating point. COCO-style size stratification: ground truth in the target tier is
-scored, ground truth in other tiers and `ignore` regions neutralise a matching prediction, and
-anything else unmatched is a false positive. Run at low confidence for a complete PR curve.
+on a single operating point. Detections are ranked by confidence, as AP requires; eval_testset.py
+ranks by IoU instead, because it scores one fixed operating point. The two are different procedures
+and neither is a bug, but they are not interchangeable.
+
+Size stratification: ground truth in the target tier is scored, and a prediction is neutralised if
+it matches ground truth of another tier or falls in an `ignore` region. What happens to the rest is
+a CHOICE, exposed as `fp_scale`:
+
+  fp_scale=None (mac dinh)  moi prediction con lai la false positive cua tang dang xet.
+  fp_scale=imgsz/max(W,H)   chi tinh la false positive khi CHINH prediction thuoc tang do.
+
+Cai thu hai la quy uoc COCO. Cai thu nhat KHONG phai, du docstring nay tung ghi la
+"COCO-style" -- do la sai sot va no quan trong: tren bo nay 88,6% prediction khong khop la
+box co kich thuoc tang gan, nen o che do mac dinh, AP tang xa phan anh so box qua kho nhieu
+hon la chat luong phat hien cay xa (0,020 so voi 0,357 tren nhanh stock).
+
+Run at low confidence for a complete PR curve.
 
 Reuses the matching helpers from eval_testset.py.
 
@@ -34,20 +48,37 @@ def box_iou(a, b):
     return inter / (aa + ab - inter + 1e-9)
 
 
-def voc_ap(rec, prec):
-    """All-point AP (VOC2010+): area under PR after making precision monotone."""
+# COCO lay trung binh precision tai 101 muc recall cach deu, sau khi lam precision
+# don dieu giam. Khac voi all-point cua VOC2010+, von tich phan dien tich chinh xac
+# duoi duong PR. Hai cach cho so hoi khac nhau, nen phai chon mot va noi ro la cai nao.
+REC_THRS = np.linspace(0.0, 1.0, 101)
+
+
+def coco_ap(rec, prec):
+    """AP noi suy 101 diem, dung nhu pycocotools.cocoeval."""
     if len(rec) == 0:
         return 0.0
-    mrec = np.concatenate(([0.0], rec, [1.0]))
-    mpre = np.concatenate(([0.0], prec, [0.0]))
-    for i in range(mpre.size - 1, 0, -1):
+    mpre = np.array(prec, dtype=float)
+    for i in range(mpre.size - 1, 0, -1):          # precision don dieu giam
         mpre[i - 1] = max(mpre[i - 1], mpre[i])
-    idx = np.where(mrec[1:] != mrec[:-1])[0]
-    return float(np.sum((mrec[idx + 1] - mrec[idx]) * mpre[idx + 1]))
+    # voi moi nguong recall, lay precision tai diem dau tien dat toi nguong do
+    idx = np.searchsorted(rec, REC_THRS, side="left")
+    q = np.where(idx < len(mpre), mpre[np.minimum(idx, len(mpre) - 1)], 0.0)
+    q[idx >= len(mpre)] = 0.0
+    return float(q.mean())
 
 
-def ap_tier(per_image, tier, iou_thr, return_curve=False):
+def ap_tier(per_image, tier, iou_thr, return_curve=False, fp_scale=None):
     """per_image[i] = (gts, igs, preds); gts=[(box,tier)], preds=[(conf,box)].
+
+    fp_scale: neu dua vao (= imgsz/max(W,H)), mot prediction khong khop chi bi tinh
+    la false positive cua tang dang xet khi CHINH NO co kich thuoc thuoc tang do,
+    theo kieu COCO. Mac dinh None giu nguyen hanh vi cu de moi caller khong doi.
+
+    Vi sao co tuy chon nay. Khong loc theo kich thuoc thi 88,6% false positive tinh
+    vao AP tang xa lai la box co kich thuoc tang GAN (do tren nhanh +Mint, seed 0):
+    AP tang xa khi do phan anh box lon doan sai nhieu hon la chat luong phat hien cay
+    xa. Do la van de vi phep dao dau cat o duoc do bang chinh dai luong nay.
 
     return_curve=True tra them (recall, precision, conf) da sap theo conf giam dan,
     de ve duong PR. Mac dinh False nen moi caller cu khong doi.
@@ -93,13 +124,21 @@ def ap_tier(per_image, tier, iou_thr, return_curve=False):
         cx = (pb[0] + pb[2]) / 2; cy = (pb[1] + pb[3]) / 2
         if in_any(cx, cy, igs):
             continue
+        # 4) COCO: detection nam ngoai dai kich thuoc cua tang bi danh ignore chu
+        #    khong tinh la FP. Thieu buoc nay thi AP tang xa dem ca box qua kho --
+        #    tren bo nay 88,6% prediction khong khop la box co kich thuoc tang gan.
+        if fp_scale is not None and tier != "all":
+            ph = (pb[3] - pb[1]) * fp_scale
+            pt = "near" if ph >= 32 else ("mid" if ph >= 16 else "far")
+            if pt != tier:
+                continue
         fp[k] = 1
     tpc = np.cumsum(tp); fpc = np.cumsum(fp)
     rec = tpc / n_target
     prec = tpc / np.maximum(tpc + fpc, 1e-9)
     if return_curve:
-        return voc_ap(rec, prec), n_target, (rec, prec, np.array([c for c, _, _ in all_preds]))
-    return voc_ap(rec, prec), n_target
+        return coco_ap(rec, prec), n_target, (rec, prec, np.array([c for c, _, _ in all_preds]))
+    return coco_ap(rec, prec), n_target
 
 
 def predictions_for(model_path, items, args):
@@ -176,19 +215,21 @@ def main():
     summary = {}
     rows = [["model", "stratum", "n_gt", "ap_mean", "ap_std", "n_seeds"]]
     ngt_ref = None
+    # Ti le POT: moi anh trong mot bo deu cung kich thuoc, nen mot gia tri la du.
+    fp_sc = args.imgsz / max(items[0][1], items[0][2])
     for lbl, cps in groups:
         print(f"\n=== {lbl}  ({len(cps)} seed) ===")
         per_seed = {s: [] for s in STRATA}
         for cp in cps:
             per_image = predictions_for(cp, items, args)
             for s in STRATA:
-                a, ng = ap_tier(per_image, s, args.iou)
+                a, ng = ap_tier(per_image, s, args.iou, fp_scale=fp_sc)
                 per_seed[s].append(a)
                 if s == "all":
                     pass
             # GT counts are identical across seeds
             if ngt_ref is None:
-                ngt_ref = {s: ap_tier(per_image, s, args.iou)[1] for s in STRATA}
+                ngt_ref = {s: ap_tier(per_image, s, args.iou, fp_scale=fp_sc)[1] for s in STRATA}
         summary[lbl] = {}
         for s in STRATA:
             m, sd = float(np.nanmean(per_seed[s])), sstd(per_seed[s])

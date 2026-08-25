@@ -1,0 +1,6 @@
+corpus,test,n_seeds,full_ap_mean,sahi_ap_mean,diff,se,t,df,p
+1080p (cam bien rang buoc),paired,5,0.299232,0.092443,-0.206789,0.020345,-10.164,4,0.0005
+1080p (cam bien rang buoc),welch,5,0.299232,0.092443,-0.206789,0.027585,-7.496,4.57,0.001
+8K (dau vao rang buoc),paired,5,0.192746,0.47803,0.285283,0.016306,17.495,4,0.0001
+8K (dau vao rang buoc),welch,5,0.192746,0.47803,0.285283,0.040686,7.012,7.56,0.0001
+interaction,welch_on_deltas,5,,,0.492073,0.026073,18.873,7.64,0.0
