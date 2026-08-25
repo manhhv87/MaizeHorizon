@@ -89,19 +89,30 @@ def main():
     lines = pdf_lines(pdf)
     # Neo tung bang vao mot cum chi co trong caption cua no. Thieu buoc nay thi mot
     # nhan dong dung chung ("Stock", "48-64") se bat nham bang khac.
+    # Cum neo phai lay tu chinh ban DA DUNG (`pdftotext -layout`), khong phai tu
+    # nguon .tex: LuaLaTeX ngat dong caption va tach dong tieu de thanh nhieu cot,
+    # nen mot cum dung trong .tex co the khong bao gio xuat hien tron ven tren mot
+    # dong cua PDF. Neo hut thi region() lui ve 0 va phep thu bat nham bang khac.
     ANCHORS = {
-        "ap":     ("Per-tier average precision", "Average precision theo t"),
-        "arch":   ("Cross-architecture control", "i chi u tr"),
-        # Neo vao DONG TIEU DE cua bang, khong vao caption: caption bi ngat dong
-        # trong PDF nen mot cum dai co the khong bao gio khop tren mot dong.
-        "cliff":  ("Far recall @conf", "Recall xa @conf"),
-        "8k":     ("Native height (px)", "Chi u cao g c (px)"),
+        "ap":     ("Per-tier average precision", "AP phát hiện theo từng tầng"),
+        "arch":   ("Cross-architecture control", "Đối chứng cross-architecture"),
+        "cliff":  ("Far recall @conf", "Recall tầng xa trên bộ Đan Phượng"),
+        # "(px)" la phan bat buoc: bang train-matched cung mo dau bang "Chieu cao
+        # goc", nen neo thieu "(px)" se bat vao bang do va bao lech gia.
+        "8k":     ("Native height (px)", "Chiều cao gốc (px)"),
     }
-    idxs = {}
+    # Neo hut phai BAO, khong duoc im lang lui ve 0: lui ve 0 nghia la tim tu dau
+    # file, bat nham mot bang khac co cung nhan dong, roi bao "lech" voi nhung con
+    # so khong lien quan. Da dinh mot lan voi bang 8K ban VI.
+    idxs, lost = {}, []
     for k, (en, vi) in ANCHORS.items():
         idxs[k] = region(lines, en if a.lang == "en" else vi)
         if idxs[k] is None:
+            lost.append(f"{k} (tim '{en if a.lang == 'en' else vi}')")
             idxs[k] = 0
+    if lost:
+        print(f"  [!] khong tim thay neo cho: {', '.join(lost)}")
+        print("      phep thu duoi day se tim tu dau file va co the bat nham bang.\n")
     r_ap, r_arch, r_cliff, r_8k = idxs["ap"], idxs["arch"], idxs["cliff"], idxs["8k"]
     F = lambda v, nd=3: fmt(v, a.lang, nd)
     bad = ok = skip = 0

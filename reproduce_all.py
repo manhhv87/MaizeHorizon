@@ -236,7 +236,7 @@ def steps(seeds):
             ["plot_scaling.py", "--prefix", "results/scaling/scaling",
              "--out", f"{base}/figures/fig_scaling", *extra])
         add("figures", f"fig_pr_far_{lang}",
-            ["plot_pr_far.py", *L, "--runs", "runs", "--tags", "stock", "nearfar", "distill",
+            ["plot_pr_far.py", *L, "--runs", "runs", "--tags", "stock", "nwd", "nearfar", "distill",
              "--seeds", *S, "--iou", "0.3", "--out", f"{base}/figures/fig_pr_far", *extra])
         add("figures", f"fig_cliff_{lang}",
             ["plot_cliff.py", "--csv", "results/detection/testset_ceiling_curve.csv",

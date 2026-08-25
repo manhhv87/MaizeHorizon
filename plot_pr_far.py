@@ -97,7 +97,7 @@ def main():
     COL = ["#0072B2", "#D55E00", "#009E73", "#E69F00", "#CC79A7"]
     STY = ["-", "--", "-.", ":", (0, (3, 1, 1, 1))]
     NICE = {"stock": "Stock", "nearfar": "+Mint", "distill": "+Distill",
-            "distill_shuffle": "+Distill (shuffle)"}
+            "distill_shuffle": "+Distill (shuffle)", "nwd": "+NWD"}
 
     fig, ax = plt.subplots(figsize=(5.4, 4.0))
     for i, tag in enumerate([t for t in a.tags if t in curves]):
