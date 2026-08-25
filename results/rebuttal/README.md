@@ -330,3 +330,28 @@ Tính lại từ các CSV từng seed đã chạy với `--fp-size-filter`.
 
 Cả hai nửa nay đều dứt khoát, kể cả nửa 1080p vốn nằm sát ngưỡng ở bản cũ. Hiệu ứng lớn
 hơn bản cũ khoảng 15 lần về trị tuyệt đối.
+
+## Soát lặp ý và số tự mâu thuẫn
+
+`check_paper_repetition.py` — không sinh CSV, là bộ soát bản thảo như `check_paper_structure.py`.
+
+```bash
+"$PY" check_paper_repetition.py                                    # bản EN
+"$PY" check_paper_repetition.py --dir paper/vi/sections --lang vi  # bản VI
+"$PY" check_paper_repetition.py --strict                           # exit 1 nếu còn
+```
+
+Hai lỗi mà `check_paper_numbers.py` **không** bắt được, vì nó đối chiếu bản thảo với CSV
+chứ không đối chiếu bản thảo với chính nó:
+
+- **lặp ý** — hai câu ở hai mục nói cùng một điều. Đo bằng độ trùng n-gram sau khi bỏ hết
+  lệnh LaTeX và số. Phải gom **đoạn** rồi mới tách câu: tách theo từng dòng thì câu nào vắt
+  qua xuống dòng sẽ bị cắt thành mảnh ngắn và biến mất khỏi phép so, lúc đó kết quả chỉ phản
+  ánh cách ngắt dòng của file. Đã dính đúng lỗi này: bản EN báo 1 cặp còn bản VI báo 6, mà
+  chênh lệch hoàn toàn do ngắt dòng.
+- **số tự mâu thuẫn** — cùng một đại lượng được báo cáo bằng hai giá trị ở hai chỗ. Bắt được
+  `h50@640` vừa ghi $60{,}9$ vừa ghi $59{,}9$ (CSV: 59,87).
+
+Lượt chạy đầu tìm ra: 1 số tự mâu thuẫn, 3 câu tự thuật "một bản trước của phân tích này đã
+sai" (không thuộc văn phong bài nộp), 1 đoạn Kết quả nhắc lại nguyên ý đoạn ngay trên nó, và
+5 cặp Phương pháp↔Kết quả nhắc lại gần như nguyên văn. Nay cả hai bản về 0.
