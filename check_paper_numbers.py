@@ -48,6 +48,27 @@ def pick(rows, **where):
     return None
 
 
+def ctx_for(ctx, lang):
+    """Chuan bi CHUOI NEO cho ngon ngu dang doc.
+
+    Neo co the la:
+      str          dung chung hai ban (chi chua LaTeX/so, khong chua chu)
+      (en, vi)     hai ban khac nhau, khi neo phai chua chu ("losses differ by" so
+                   voi "chenh nhau")
+
+    Sau khi chon ban, doi dau thap phan cho ban tieng Viet: mot neo nhu
+    "$\\mathrm{df}=4.5$" se khong bao gio khop o ban vi (o do la "4{,}5"). Chi doi
+    dau cham NAM GIUA hai chu so, de khong dung toi `\\mathrm{df}` hay lenh nao khac.
+    """
+    if ctx is None:
+        return None
+    if isinstance(ctx, (tuple, list)):
+        ctx = ctx[0] if lang == "en" else ctx[1]
+    if lang != "vi":
+        return ctx
+    return re.sub(r"(?<=\d)\.(?=\d)", "{,}", ctx)
+
+
 def fmt(v, nd, lang):
     s = f"{float(v):.{nd}f}"
     return s.replace(".", "{,}") if lang == "vi" else s
@@ -135,17 +156,34 @@ CHECKS = [
     ("tiling E5 ha mau sahi", "results/crosssite/E5_sahi_8k_ds1080_n5_fpfilt.csv",
      dict(tier="far"), "sahi_ap_mean", 3),
 
-    # --- thong ke cua phep dao dau. Dang ky truoc day chi co gia tri AP, nen khi
-    # phep kiem E5 doi tu Welch sang ghep cap (t 3,85 -> 4,80; p 0,012 -> 0,0086)
-    # thi khong tang nao bat duoc bai dang mang so cu. Nay co ca t va p.
-    ("tiling tuong tac 1080p-8K", "results/rebuttal/tiling_reversal_stats_fpfilt.csv",
-     dict(corpus="interaction"), "diff", 3),
+    # --- thong ke cua phep dao dau.
+    #
+    # Dang ky ban dau chi co gia tri AP, nen khi phep kiem E5 doi tu Welch sang ghep
+    # cap (t 3,85 -> 4,80; p 0,012 -> 0,009) thi khong tang nao bat duoc bai dang mang
+    # so cu. Ban sau do them `diff` va `t` -- van chua du: da thu sua p 0,009 -> 0,012
+    # VA df 4 -> 9 trong ban thao, bo kiem van bao 49/49 dat.
+    #
+    # Nay dang ky ca `p` va `df`, va moi muc deu co NEO ngu canh. Khong co neo thi mot
+    # so nhu 4,80 trung ngau nhien o bat ky cho nao trong bai cung tinh la dat, ma bai
+    # nay day so; neo buoc gia tri phai nam dung trong cum thong ke cua chinh no.
+    ("tiling tuong tac diff", "results/rebuttal/tiling_reversal_stats_fpfilt.csv",
+     dict(corpus="interaction"), "diff", 3,
+     ("losses differ by ${v}$", "chênh nhau ${v}$")),
     ("tiling tuong tac t", "results/rebuttal/tiling_reversal_stats_fpfilt.csv",
-     dict(corpus="interaction"), "t", (2, 1)),
+     dict(corpus="interaction"), "t", (2, 1), "($t={v}$, $\\mathrm{df}=4.5$"),
+    ("tiling tuong tac df", "results/rebuttal/tiling_reversal_stats_fpfilt.csv",
+     dict(corpus="interaction"), "df", 1, "$\\mathrm{df}={v}$, $p=0.0006$"),
+    ("tiling tuong tac p", "results/rebuttal/tiling_reversal_stats_fpfilt.csv",
+     dict(corpus="interaction"), "p", 4, "$\\mathrm{df}=4.5$, $p={v}$"),
     ("E5 tuong tac diff", "results/rebuttal/E5_control_stats_fpfilt.csv",
-     dict(corpus="interaction"), "diff", 3),
+     dict(corpus="interaction"), "diff", 3,
+     ("losses differ by ${v}$ ($t=4.80$", "chênh nhau ${v}$ ($t=4{,}80$")),
     ("E5 tuong tac t", "results/rebuttal/E5_control_stats_fpfilt.csv",
-     dict(corpus="interaction"), "t", (2, 1)),
+     dict(corpus="interaction"), "t", (2, 1), "($t={v}$, $\\mathrm{df}=4$"),
+    ("E5 tuong tac df", "results/rebuttal/E5_control_stats_fpfilt.csv",
+     dict(corpus="interaction"), "df", 0, "$\\mathrm{df}={v}$, $p=0.009$"),
+    ("E5 tuong tac p", "results/rebuttal/E5_control_stats_fpfilt.csv",
+     dict(corpus="interaction"), "p", 3, "$\\mathrm{df}=4$, $p={v}$"),
 
     # --- do nhay cua h50 theo nguong bin thua (muc sec:res-minn). Nguong nay tung
     # KHONG duoc khai bao trong Methods; nay bai bao cao ca uoc luong don dieu.
@@ -266,7 +304,7 @@ def main():
     print(f"=== doi chieu {a.dir} voi results/ ===")
     for entry in CHECKS:
         label, path, where, col, nd = entry[:5]
-        ctx = entry[5] if len(entry) > 5 else None
+        ctx = ctx_for(entry[5] if len(entry) > 5 else None, a.lang)
         nds = nd if isinstance(nd, tuple) else (nd,)
         rows = load(path)
         if rows is None:
