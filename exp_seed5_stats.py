@@ -68,6 +68,16 @@ def welch_t(a, b):
                 p=float(r.pvalue), n=min(na, nb))
 
 
+def paired_interaction(a, b):
+    """Hieu-cua-hieu, ghep cap theo seed: a - b tren tung seed."""
+    from scipy import stats
+    d = [x - y for x, y in zip(a, b)]
+    m, sd, n = mean_sd(d)
+    r = stats.ttest_rel(a, b)
+    return dict(diff=m, se=sd / math.sqrt(n), t=float(r.statistic),
+                df=float(n - 1), p=float(r.pvalue), n=n)
+
+
 def fmt(d):
     return (f"diff={d['diff']:+.4f}  SE={d['se']:.4f}  t={d['t']:+.2f}  "
             f"df={d['df']:.1f}  p={d['p']:.3f}")
@@ -85,13 +95,14 @@ def main():
 
     rows = [["corpus", "test", "n_seeds", "full_ap_mean", "sahi_ap_mean",
              "diff", "se", "t", "df", "p"]]
-    keep = {}
+    keep, keep_seeds = {}, {}
     for path, lab in ((a.p1080, a.label_1080), (a.p8k, a.label_8k)):
         d = read_deltas(path, a.tier)
         full = [x[1] for x in d]
         sahi = [x[2] for x in d]
         dl = [x[3] for x in d]
         keep[lab] = dl
+        keep_seeds[lab] = [x[0] for x in d]
         fm = sum(full) / len(full)
         sm = sum(sahi) / len(sahi)
         print(f"\n=== {lab} | tang {a.tier} | {len(d)} seed ===")
@@ -104,11 +115,26 @@ def main():
                          round(res["t"], 3), round(res["df"], 2), round(res["p"], 4)])
 
     labs = list(keep)
-    inter = welch_t(keep[labs[0]], keep[labs[1]])
-    print(f"\n=== phep kiem tuong tac: hieu giua hai muc thay doi ===")
+    # Ghep cap khi va chi khi hai ve chay tren CUNG tap seed, tuc cung checkpoint.
+    # Doi chung E5 thoa dieu do (ca hai nhanh la stock_s0..s4 tren cung canh); phep
+    # so 1080p<->8K thi khong (nearfar so voi stock, hai model khac nhau), nen o do
+    # Welch moi dung. Bo phan ghep cap khi co no la vut bo luc thong ke: tren E5,
+    # ghep cap cho t(4)=4,80 p=0,0086 con Welch cho t=3,85 p=0,0122.
+    sa, sb = keep_seeds[labs[0]], keep_seeds[labs[1]]
+    if sa and sa == sb:
+        inter = paired_interaction(keep[labs[1]], keep[labs[0]])
+        how = "paired_on_deltas"
+    else:
+        inter = welch_t(keep[labs[0]], keep[labs[1]])
+        how = "welch_on_deltas"
+    print(f"\n=== phep kiem tuong tac: hieu giua hai muc thay doi ({how}) ===")
     print(f"  {fmt(inter)}")
+    if how == "paired_on_deltas":
+        print("  (ghep cap: hai ve dung chung checkpoint va chung canh)")
+    else:
+        print("  (Welch: hai ve dung nhanh/checkpoint khac nhau, khong ghep cap duoc)")
     print("  (day moi la khang dinh cua bai: dau doi chieu, khong phai do lon tung nua)")
-    rows.append(["interaction", "welch_on_deltas", inter["n"], "", "",
+    rows.append(["interaction", how, inter["n"], "", "",
                  round(inter["diff"], 6), round(inter["se"], 6),
                  round(inter["t"], 3), round(inter["df"], 2), round(inter["p"], 4)])
 

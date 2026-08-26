@@ -607,7 +607,27 @@ byte-for-byte** so với lượt chạy bằng NMS Python.
 | 1080p | −0,205 | −9,54 | 0,0007 |
 | 8K gốc | −0,014 | −2,72 | **0,053** |
 | tương tác 1080p↔8K | +0,191 | 8,62 | 0,001 |
-| đối chứng E5 | +0,061 | 3,85 | 0,012 |
+| đối chứng E5 | +0,061 | **4,80** | **0,0086** |
+
+⚠️ **Phép tương tác của E5 phải GHÉP CẶP, không dùng Welch.** Hai nhánh E5 chạy trên **cùng bộ
+checkpoint** (`stock_s0`–`s4`) và cùng cảnh — khung gốc so với chính bản sao hạ mẫu của nó — nên
+hiệu-của-hiệu ghép cặp theo seed. Cả năm seed cùng dấu:
+
+| seed | 8K gốc | hạ mẫu | hiệu |
+|---|---|---|---|
+| s0 | −0,00946 | −0,10619 | +0,09673 |
+| s1 | −0,01445 | −0,09348 | +0,07904 |
+| s2 | +0,00253 | −0,02090 | +0,02343 |
+| s3 | −0,02245 | −0,06752 | +0,04507 |
+| s4 | −0,02785 | −0,09068 | +0,06284 |
+
+Welch ném đi đúng thông tin ấy: `t=3,85 p=0,0122` so với ghép cặp `t(4)=4,80 p=0,0086`.
+
+Ngược lại, phép so **1080p↔8K vẫn phải dùng Welch**: hai bên chạy hai nhánh khác nhau (`nearfar`
+so với `stock`), nên "seed 0" của hai bên là hai model khác nhau và không ghép cặp được.
+
+`exp_seed5_stats.py` nay **tự chọn** phép kiểm theo việc hai vế có cùng tập seed hay không, và ghi
+lựa chọn vào cột `test` (`paired_on_deltas` so với `welch_on_deltas`) để người đọc không phải đoán.
 
 ⚠️ Nửa 8K nay ở **p = 0,053**, tức mức giảm 8% **không phân giải được khi đứng riêng**. Phát biểu
 đúng là: trên camera bị đầu vào giới hạn, cắt ô không giúp cũng không hại một cách đo được. Phép

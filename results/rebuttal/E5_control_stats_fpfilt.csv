@@ -3,4 +3,4 @@ corpus,test,n_seeds,full_ap_mean,sahi_ap_mean,diff,se,t,df,p
 8K ha mau (tile 320),welch,5,0.106725,0.030967,-0.075758,0.021196,-3.574,4.82,0.017
 8K goc (tile 1280),paired,5,0.179573,0.165237,-0.014336,0.005276,-2.717,4,0.0531
 8K goc (tile 1280),welch,5,0.179573,0.165237,-0.014336,0.040013,-0.358,7.93,0.7295
-interaction,welch_on_deltas,5,,,0.061421,0.015963,3.848,4.97,0.0122
+interaction,paired_on_deltas,5,,,0.061421,0.012785,4.804,4.0,0.0086
