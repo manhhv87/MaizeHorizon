@@ -522,3 +522,45 @@ Nay `fp_scale_of()` lấy hệ số từ bộ ảnh và **dừng hẳn** nếu �
 **Kết quả đổi hẳn:** AP tầng xa trên 8K từ `0,193 → 0,478` (+148%) thành `0,180 → 0,163`
 (−9%). Phép đảo dấu không tồn tại — cắt ô làm giảm AP tầng xa ở mọi điều kiện đã thử.
 Đối chứng E5 co từ +0,361 xuống +0,060 (p=0,014).
+
+## Độ nhạy của `h50` theo ngưỡng bin thưa, và ước lượng không cần ngưỡng
+
+`exp_h50_robustness.py` → `hd_h50_minn_sensitivity.csv`, `hd_h50_isotonic.csv`
+
+`exp_resolution_sweep.py` loại các bin dưới `--h50-min-n` (mặc định 100) trước khi nội suy.
+Ngưỡng này **không có trong Methods** ở các bản trước và được thêm vào sau khi thấy sai lệch
+trên bộ 8K, mà toàn bộ `d50` của bài lại dựa vào nó — nên phải công bố và đo.
+
+Nguyên nhân thật không phải "bin thưa gây nhiễu" mà là đường cong recall **không đơn điệu**:
+tại imgsz 2560, bin 24–32 px có **11 hộp** với recall 0,600, còn bin 32–48 px có 220 hộp với
+recall 0,365. Quy tắc "bin đầu tiên vượt 0,5" vì thế bám vào 11 hộp.
+
+```bash
+# (a) do nhay theo ngưỡng — đọc từ CSV đã bin, không cần GPU
+"$PY" exp_h50_robustness.py --from-csv results/crosssite/hd_sweep_phys.csv \
+  --out results/crosssite/hd_h50_minn_sensitivity.csv
+"$PY" exp_h50_robustness.py --from-csv results/scaling/scaling_phys.csv \
+  --out results/scaling/h50_minn_sensitivity.csv
+
+# (b) ước lượng đơn điệu trên từng hộp — không bin, không ngưỡng, bootstrap theo ảnh
+"$PY" exp_h50_robustness.py --labels-dir "$LAB2" --images-dir "$IMG2" --runs runs \
+  --tag stock --seeds 0 1 2 3 4 --imgsz-list 1280 1920 2560 3840 \
+  --iou 0.3 --conf 0.001 --max-det 3000 --boot 1000 --device 0 \
+  --out results/crosssite/hd_h50_isotonic.csv
+```
+
+### Kết quả
+
+`h50` là hàm bậc thang của ngưỡng, có **đúng một bước nhảy** giữa 10 và 25 — tức đúng chỗ loại
+bin 11 hộp. Từ 25 tới 1000 không đổi. Bộ 1080p không nhạy ở mọi ngưỡng (đường cong đơn điệu),
+nên lựa chọn này chỉ ảnh hưởng **hai ô** trong bài.
+
+| imgsz | bài dùng (min_n=100) | đơn điệu, không ngưỡng | KTC bootstrap |
+|---|---|---|---|
+| 1280 | 111,42 | 112,96 | [106,58 – 117,14] |
+| 1920 | 87,21 | 85,70 | [85,58 – 94,92] |
+| 2560 | 71,23 | 75,26 | [67,07 – 78,51] |
+| 3840 | 66,07 | 67,75 | [63,24 – 73,61] |
+
+Cả bốn giá trị bài dùng nằm **trong** khoảng tin cậy của ước lượng không tham số. Ngưỡng là cách
+xử lý đường cong không đơn điệu, không phải thứ tạo ra kết quả.

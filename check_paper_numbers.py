@@ -130,8 +130,19 @@ CHECKS = [
      dict(tier="far"), "full_ap_mean", 3),
     ("tiling 1080p sahi AP", "results/baselines/sahi_ap_n5_fpfilt.csv",
      dict(tier="far"), "sahi_ap_mean", 3),
-    ("tiling 8K near AP sau cat o", "results/crosssite/hd_sahi_n5_fpfilt.csv",
-     dict(tier="near"), "sahi_ap_mean", 3),
+    # Bo o "near sau cat o": bai khong con trich dan no sau khi cat o chuyen thanh
+    # ket qua am (huong A). Giu hai o far vi bai van bao cao ca hai.
+    ("tiling E5 ha mau sahi", "results/crosssite/E5_sahi_8k_ds1080_n5_fpfilt.csv",
+     dict(tier="far"), "sahi_ap_mean", 3),
+
+    # --- do nhay cua h50 theo nguong bin thua (muc sec:res-minn). Nguong nay tung
+    # KHONG duoc khai bao trong Methods; nay bai bao cao ca uoc luong don dieu.
+    ("h50 iso @1280", "results/crosssite/hd_h50_isotonic.csv",
+     dict(imgsz="1280"), "h50_isotonic", 1),
+    ("h50 iso @2560", "results/crosssite/hd_h50_isotonic.csv",
+     dict(imgsz="2560"), "h50_isotonic", 1),
+    ("h50 iso @3840", "results/crosssite/hd_h50_isotonic.csv",
+     dict(imgsz="3840"), "h50_isotonic", 1),
 
     # --- diem gay cua quy luat min (M8, muc sec:res-native)
     ("h50 stock 1920 vs 960", "results/rebuttal/M8_h50_crossover.csv",
