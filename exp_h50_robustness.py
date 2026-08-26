@@ -87,24 +87,53 @@ def pava(y, w):
 def h50_isotonic(heights, hits):
     """h50 tu hoi quy don dieu tren tung hop, khong chia bin.
 
+    GOP TIE truoc khi chay PAVA. Nhieu hop co dung cung chieu cao, va PAVA chay tren
+    tung quan sat roi rac se cho ket qua PHU THUOC THU TU du lieu: trong mot khoi
+    tie, day hit [1,0,1,0] va [0,1,0,1] cho hai duong khop khac nhau. Do tren du
+    lieu tong hop, xao thu tu lam h50 xe dich 2 px. Gop moi chieu cao thanh mot diem
+    (chieu cao, ti le trung binh, so quan sat) roi chay PAVA CO TRONG SO thi ket qua
+    la mot ham cua du lieu, khong con la ham cua thu tu doc.
+
     Sap theo chieu cao GIAM dan roi ep recall khong tang, tuc gia thiet "cay cang
     nho cang kho phat hien". Sau do doc chieu cao tai cho duong cong cat 0,5.
     """
-    h = np.asarray(heights, dtype=float); y = np.asarray(hits, dtype=float)
-    o = np.argsort(-h)                     # cao -> thap
-    h, y = h[o], y[o]
-    fit = np.asarray(pava(y, np.ones_like(y)))
+    h = np.asarray(heights, dtype=float)
+    y = np.asarray(hits, dtype=float)
+    if h.size == 0:
+        return float("nan")
+    uh, inv = np.unique(h, return_inverse=True)          # uh tang dan
+    cnt = np.bincount(inv, minlength=uh.size).astype(float)
+    tot = np.bincount(inv, weights=y, minlength=uh.size)
+    uh, cnt, tot = uh[::-1], cnt[::-1], tot[::-1]        # cao -> thap
+    rate = tot / cnt
+    fit = np.asarray(pava_weighted(rate, cnt))
     below = np.flatnonzero(fit < 0.5)
     if below.size == 0:
-        return float("nan")                # khong bao gio tut duoi 0,5
+        return float("nan")                              # khong bao gio tut duoi 0,5
     i = below[0]
     if i == 0:
-        return float(h[0])
+        return float(uh[0])
     y1, y2 = fit[i - 1], fit[i]
     if y1 == y2:
-        return float(h[i])
+        return float(uh[i])
     t = (y1 - 0.5) / (y1 - y2)
-    return float(h[i - 1] + t * (h[i] - h[i - 1]))
+    return float(uh[i - 1] + t * (uh[i] - uh[i - 1]))
+
+
+def pava_weighted(y, w):
+    """PAVA co trong so, chieu y len ham KHONG TANG. Tra ve gia tri tung diem."""
+    val, wt, cnt = [], [], []
+    for yi, wi in zip(map(float, y), map(float, w)):
+        val.append(yi); wt.append(wi); cnt.append(1)
+        while len(val) > 1 and val[-2] < val[-1]:
+            v2, w2, c2 = val.pop(), wt.pop(), cnt.pop()
+            v1, w1, c1 = val.pop(), wt.pop(), cnt.pop()
+            val.append((v1 * w1 + v2 * w2) / (w1 + w2))
+            wt.append(w1 + w2); cnt.append(c1 + c2)
+    out = []
+    for v, c in zip(val, cnt):
+        out.extend([v] * c)
+    return out
 
 
 def collect(model_path, items, imgsz, conf, iou, max_det, device, plant_class):

@@ -27,8 +27,33 @@ STRATA = ["near", "mid", "far", "all"]
 IMGSZ_REF = 1280   # POT/tier tham chieu (giong baseline) -> tier khong doi theo tiling
 
 
-def nms(boxes, iou_thr):
-    """Greedy NMS over (conf, box) pairs, highest confidence first."""
+def nms(boxes, iou_thr, _force_python=False):
+    """Greedy NMS over (conf, box) pairs, highest confidence first.
+
+    Dung torchvision.ops.nms khi co, lui ve vong lap Python khi khong. CUNG mot
+    thuat toan tham lam, cung thu tu (diem giam dan), cung nguong -- da doi chieu
+    tren du lieu ngau nhien: tap box giu lai TRUNG KHIT o N=2000 va N=6000, va
+    `--selftest` kiem lai moi lan chay.
+
+    Khac nhau chi o toc do, nhung o day khac rat nhieu. Ban Python la O(N*K) chay
+    trong Python thuan: 6,7 giay cho 6000 box, tuc khoang 1,5 gio chi rieng NMS cho
+    mot lan quet bo 8K (750 khung). Ban torchvision mat 11 ms, nhanh hon 600 lan.
+    Truoc khi doi, GPU lam xong phan cua no roi ngoi cho mot loi CPU chay het cong
+    suat -- dung la ly do cac lo 8K mat hang gio.
+    """
+    if not boxes:
+        return []
+    if not _force_python:
+        try:
+            import torch
+            from torchvision.ops import nms as _tvnms
+            dev = "cuda" if torch.cuda.is_available() else "cpu"
+            bt = torch.tensor([x[1] for x in boxes], dtype=torch.float32, device=dev)
+            sc = torch.tensor([x[0] for x in boxes], dtype=torch.float32, device=dev)
+            idx = _tvnms(bt, sc, float(iou_thr)).cpu().tolist()
+            return [boxes[i] for i in idx]          # tra ve theo diem giam dan
+        except Exception:
+            pass
     keep = []
     for c, b in sorted(boxes, key=lambda z: -z[0]):
         if all(box_iou(b, kb) < iou_thr for _, kb in keep):
@@ -99,14 +124,29 @@ def tile_predict(model, ip, W, H, args):
                     b = xy[j]
                     boxes.append((float(cf[j]), [float(b[0]), float(b[1]), float(b[2]), float(b[3])]))
     merged = nms(boxes, args.nms_iou)
-    # Cat ve tran o muc KHUNG. `max_det` o tren ap cho TUNG o, nen khong co buoc nay
-    # thi nhanh cat o duoc ngan sach gap so-o lan nhanh toan khung (~28 o tren bo 8K),
-    # va cau "hai nhanh dung cung mot tran phat hien" trong bai la sai. Giu box theo
-    # do tin cay giam dan, giong cach Ultralytics ap tran cho mot lan suy luan.
-    cap = args.frame_max_det if args.frame_max_det is not None else args.max_det
+    # Tran o muc KHUNG, MAC DINH TAT.
+    #
+    # Mot tran chi la confound khi no CHAM. Do tren bo 8K: nhanh toan khung tra ve
+    # ~1520 box moi khung o max_det=3000, tuc khong khung nao cham tran; con nhanh
+    # cat o cho ~4500-5000 box plant sau NMS. Dat tran 3000 cho nhanh cat o vi the
+    # KHONG lam hai ben ngang nhau ma cat cut mot ben trong khi ben kia tu do --
+    # dung chieu nguoc lai voi loi ban dau. Hai ben ngang nhau khi khong ben nao bi
+    # cat, va do la trang thai mac dinh o day.
+    #
+    # Con mot bat doi xung nua khong sua duoc bang cach cat: Ultralytics ap max_det
+    # cho CA HAI class roi ta moi loc lay plant, nen nhanh toan khung "tieu" ngan
+    # sach cho ca lop ignore (~66% so box tren bo 8K). Vi tran khong cham nen dieu
+    # do vo hai o day; `n_frames_at_cap` duoi kia la de kiem lai dieu do moi lan chay.
+    cap = args.frame_max_det or 0
+    tile_predict.n_merged.append(len(merged))
     if cap and len(merged) > cap:
+        tile_predict.n_capped += 1
         merged = sorted(merged, key=lambda cb: -cb[0])[:cap]
     return merged
+
+
+tile_predict.n_merged = []
+tile_predict.n_capped = 0
 
 
 def sahi_per_image(model_path, items, args):
@@ -120,6 +160,18 @@ def sahi_per_image(model_path, items, args):
         preds = tile_predict(model, ip, w, h, args)
         out.append((gts, [b[:4] for b in ignores], preds))
     return out
+
+
+def ap_default(flag):
+    """Gia tri mac dinh cua mot co, doc tu chinh parser -- de phep tu kiem khong
+    phai chep lai hang so va lech khoi code."""
+    import argparse as _a
+    import inspect
+    src = inspect.getsource(main)
+    for line in src.split("\n"):
+        if f'"{flag}"' in line and "default=" in line:
+            return int(line.split("default=")[1].split(",")[0].split(")")[0].strip())
+    raise KeyError(flag)
 
 
 def run_selftest():
@@ -155,7 +207,18 @@ def run_selftest():
     # 6) tran o muc khung phai duoc ap sau khi gop o
     import inspect
     src = inspect.getsource(tile_predict)
-    chk("tile_predict co cat ve tran muc khung", "frame_max_det" in src)
+    chk("tran khung mac dinh TAT (0)", ap_default("--frame-max-det") == 0)
+    chk("tile_predict co dem so khung bi cat", "n_capped" in src)
+    # 7) ban nhanh (torchvision) phai cho DUNG tap box nhu ban Python
+    import random as _r
+    _r.seed(0)
+    _bb = []
+    for _ in range(400):
+        _x = _r.uniform(0, 900); _y = _r.uniform(0, 900)
+        _bb.append((_r.random(), [_x, _y, _x + _r.uniform(10, 90), _y + _r.uniform(10, 90)]))
+    _fast = {tuple(z[1]) for z in nms(_bb, 0.6)}
+    _slow = {tuple(z[1]) for z in nms(_bb, 0.6, _force_python=True)}
+    chk("nms nhanh == nms Python", _fast == _slow)
 
     print(f"\n[SELFTEST] {sum(ok)}/{len(ok)} PASS")
     if not all(ok):
@@ -180,9 +243,9 @@ def main():
     ap.add_argument("--no-add-full", dest="add_full", action="store_false")
     ap.add_argument("--device", default="0")
     ap.add_argument("--max-det", type=int, default=1000, help="tran cho MOI o")
-    ap.add_argument("--frame-max-det", type=int, default=None,
-                    help="tran sau khi gop o; mac dinh bang --max-det de khop nhanh toan khung. "
-                         "Dat 0 de bo cap (hanh vi cu, KHONG khop tran).")
+    ap.add_argument("--frame-max-det", type=int, default=0,
+                    help="tran sau khi gop o; 0 = khong cat (mac dinh). Chi dat khac 0 khi "
+                         "da kiem rang nhanh toan khung cung bi tran do rang buoc.")
     ap.add_argument("--plant-class", type=int, default=0)
     ap.add_argument("--ignore-class", type=int, default=1)
     ap.add_argument("--weight", default="best.pt", choices=["best.pt", "last.pt"])
@@ -253,6 +316,15 @@ def main():
                 pass
         if ngt is None:
             ngt = {s: ap_tier(per_s, s, args.iou)[1] for s in STRATA}
+
+    # Chan doan tran: mot tran chi la confound khi no CHAM. In ra de moi lan chay
+    # deu kiem lai duoc, thay vi tin vao gia tri mac dinh.
+    nm = tile_predict.n_merged
+    if nm:
+        import statistics
+        print(f"\n[tran] cat o: {statistics.mean(nm):.0f} box/khung trung binh, "
+              f"lon nhat {max(nm)} | --frame-max-det={args.frame_max_det or 'tat'} "
+              f"| so khung bi cat: {tile_predict.n_capped}/{len(nm)}")
 
     rows = [["tier", "n_gt", "full_ap_mean", "full_ap_std", "sahi_ap_mean", "sahi_ap_std", "delta_sahi_minus_full", "n_seeds"]]
     print("\n=== AP per-tier: FULL (baseline) vs SAHI (tiled) ===")

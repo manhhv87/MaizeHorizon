@@ -519,9 +519,51 @@ Nay `fp_scale_of()` lấy hệ số từ bộ ảnh và **dừng hẳn** nếu �
 `--frame-max-det` cắt sau khi gộp ô, mặc định bằng `--max-det`. Ba phép tự kiểm mới
 (`--selftest`, 9/9) buộc hệ số lọc phải trùng hệ số phân tầng, kiểm ở **cả hai** cỡ ảnh.
 
-**Kết quả đổi hẳn:** AP tầng xa trên 8K từ `0,193 → 0,478` (+148%) thành `0,180 → 0,163`
-(−9%). Phép đảo dấu không tồn tại — cắt ô làm giảm AP tầng xa ở mọi điều kiện đã thử.
-Đối chứng E5 co từ +0,361 xuống +0,060 (p=0,014).
+**Kết quả đổi hẳn:** AP tầng xa trên 8K từ `0,193 → 0,478` (+148%) thành `0,180 → 0,165`
+(−8%). Phép đảo dấu không tồn tại — cắt ô làm giảm AP tầng xa ở mọi điều kiện đã thử.
+
+### Lượt sửa thứ hai (cùng ngày): trần khung và NMS
+
+Bản sửa đầu áp trần khung bằng `--max-det` cho nhánh cắt ô. **Đó là sai theo chiều ngược lại.**
+Một trần chỉ là confound khi nó **chạm**, và đo ra thì nhánh toàn khung không hề chạm (1 522
+box/khung trên trần 3 000, 0/12 khung), trong khi trần mới cắt cụt nhánh cắt ô ở **mọi** khung
+(4 500–5 000 box → 3 000). Còn một bất đối xứng nữa không sửa được bằng cắt: Ultralytics áp
+`max_det` cho **cả hai class** rồi ta mới lọc plant, nên nhánh toàn khung "tiêu" ngân sách cho cả
+lớp ignore (~66% số box trên bộ 8K) — vô hại ở đây vì trần không chạm.
+
+Nay trần khung **mặc định tắt**, và script in chẩn đoán mỗi lần chạy để kiểm lại thay vì tin vào
+mặc định:
+
+| Lô | Box/khung | Lớn nhất | Bị cắt |
+|---|---|---|---|
+| 1080p | 547 | 975 | 0/600 |
+| 8K gốc | 4 139 | 10 543 | 0/750 |
+| 8K hạ mẫu | 2 765 | 6 208 | 0/750 |
+
+`nms()` cũng chuyển sang `torchvision.ops.nms`: cùng thuật toán tham lam, cùng thứ tự, cùng
+ngưỡng, **tập box giữ lại trùng khít** (kiểm ở N=2000 và N=6000, và `--selftest` kiểm mỗi lần
+chạy). Bản Python là O(N×K) chạy thuần Python, mất ~1,5 giờ chỉ riêng NMS cho một lượt quét 8K,
+trong khi GPU ngồi không. Bản mới nhanh hơn ~600 lần. `sahi_ap_n5_fpfilt.csv` sinh ra **giống hệt
+byte-for-byte** so với lượt chạy bằng NMS Python.
+
+### Số cuối
+
+| | full AP xa | sahi AP xa | thay đổi |
+|---|---|---|---|
+| 1080p | 0,3006 | 0,0953 | −68,3% |
+| 8K hạ mẫu | 0,1067 | 0,0311 | −70,8% |
+| 8K gốc | 0,1796 | 0,1652 | −8,0% |
+
+| Phép kiểm | Δ | t | p |
+|---|---|---|---|
+| 1080p | −0,205 | −9,54 | 0,0007 |
+| 8K gốc | −0,014 | −2,72 | **0,053** |
+| tương tác 1080p↔8K | +0,191 | 8,62 | 0,001 |
+| đối chứng E5 | +0,061 | 3,85 | 0,012 |
+
+⚠️ Nửa 8K nay ở **p = 0,053**, tức mức giảm 8% **không phân giải được khi đứng riêng**. Phát biểu
+đúng là: trên camera bị đầu vào giới hạn, cắt ô không giúp cũng không hại một cách đo được. Phép
+tương tác vẫn vững.
 
 ## Độ nhạy của `h50` theo ngưỡng bin thưa, và ước lượng không cần ngưỡng
 
