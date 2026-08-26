@@ -135,6 +135,18 @@ CHECKS = [
     ("tiling E5 ha mau sahi", "results/crosssite/E5_sahi_8k_ds1080_n5_fpfilt.csv",
      dict(tier="far"), "sahi_ap_mean", 3),
 
+    # --- thong ke cua phep dao dau. Dang ky truoc day chi co gia tri AP, nen khi
+    # phep kiem E5 doi tu Welch sang ghep cap (t 3,85 -> 4,80; p 0,012 -> 0,0086)
+    # thi khong tang nao bat duoc bai dang mang so cu. Nay co ca t va p.
+    ("tiling tuong tac 1080p-8K", "results/rebuttal/tiling_reversal_stats_fpfilt.csv",
+     dict(corpus="interaction"), "diff", 3),
+    ("tiling tuong tac t", "results/rebuttal/tiling_reversal_stats_fpfilt.csv",
+     dict(corpus="interaction"), "t", (2, 1)),
+    ("E5 tuong tac diff", "results/rebuttal/E5_control_stats_fpfilt.csv",
+     dict(corpus="interaction"), "diff", 3),
+    ("E5 tuong tac t", "results/rebuttal/E5_control_stats_fpfilt.csv",
+     dict(corpus="interaction"), "t", (2, 1)),
+
     # --- do nhay cua h50 theo nguong bin thua (muc sec:res-minn). Nguong nay tung
     # KHONG duoc khai bao trong Methods; nay bai bao cao ca uoc luong don dieu.
     ("h50 iso @1280", "results/crosssite/hd_h50_isotonic.csv",
