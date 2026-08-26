@@ -93,6 +93,14 @@ def main():
         h, w = im.shape[:2]
         plants, ignores = read_gt(lp, w, h, a.plant_class, a.ignore_class)
         items.append((ip, w, h, plants, ignores))
+    if not items:
+        raise SystemExit("khong doc duoc anh nao")
+    # He so doi chieu cao px goc -> POT. Phai lay tu CHINH bo anh dang cham; cung
+    # hoa 1920 se sai o moi bo khong phai 1080p.
+    sizes = {(w, h) for _, w, h, _, _ in items}
+    if len(sizes) != 1:
+        raise SystemExit(f"anh khong dong nhat kich thuoc ({len(sizes)} co)")
+    fp_sc = a.imgsz / max(*sizes.pop())
     print(f"[i] {len(items)} images, AP@IoU={a.iou}, conf={a.conf}, max_det={a.max_det}")
 
     bins = [native_bin(PHYS_EDGES[i]) for i in range(len(PHYS_EDGES) - 1)]
@@ -107,7 +115,7 @@ def main():
                 continue
             pi = predictions_native(YOLO(wp), items, imgsz, a)
             for b in bins:
-                v, n = ap_tier(pi, b, a.iou, fp_scale=a.imgsz / 1920.0)
+                v, n = ap_tier(pi, b, a.iou, fp_scale=fp_sc)
                 per_seed[b].append(v)
                 n_gt[b] = n
         table[imgsz] = (per_seed, n_gt)

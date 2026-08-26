@@ -61,6 +61,14 @@ def main():
         plants, ignores = read_gt(lp, w, h, a.plant_class, a.ignore_class)
         items.append((ip, w, h, plants, ignores))
     if not items:
+        raise SystemExit("khong doc duoc anh nao")
+    # He so doi chieu cao px goc -> POT. Phai lay tu CHINH bo anh dang cham; cung
+    # hoa 1920 se sai o moi bo khong phai 1080p.
+    sizes = {(w, h) for _, w, h, _, _ in items}
+    if len(sizes) != 1:
+        raise SystemExit(f"anh khong dong nhat kich thuoc ({len(sizes)} co)")
+    fp_sc = a.imgsz / max(*sizes.pop())
+    if not items:
         raise SystemExit("khong ghep duoc nhan voi anh nao")
     print(f"[i] {len(items)} anh")
     grid = np.linspace(0.0, 1.0, 201)
@@ -73,7 +81,7 @@ def main():
                 print(f"[skip] {ckpt}"); continue
             per_image = predictions_for(ckpt, items, a)
             val, n, (rec, prec, _) = ap_tier(per_image, a.tier, a.iou, return_curve=True,
-                                             fp_scale=a.imgsz / 1920.0)
+                                             fp_scale=fp_sc)
             # precision bao hoa (monotone) roi noi suy len luoi recall chung
             pm = np.maximum.accumulate(prec[::-1])[::-1]
             per_seed.append((np.interp(grid, rec, pm, left=pm[0] if len(pm) else 0.0, right=0.0), val))

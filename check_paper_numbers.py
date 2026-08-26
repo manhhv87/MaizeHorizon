@@ -151,6 +151,28 @@ CHECKS = [
     ("AP nwd mid", "results/detection/testset_ap03.csv",
      dict(model="nwd", stratum="mid"), "ap_mean", 3),
 
+    # --- Chuyen giao zero-shot sang bo 8K. Ba o nay tung lech giua hai ban dich:
+    # ban EN dung so 5 seed con ban VI con giu so 3 seed (0,916/0,678/0,183), va
+    # khong bo kiem nao thay, vi chung khong nam trong dang ky. Nay co.
+    ("8K zero-shot near", "results/crosssite/namsach_ceiling.csv",
+     dict(model="stock", stratum="near"), "recall_mean", 3),
+    ("8K zero-shot mid", "results/crosssite/namsach_ceiling.csv",
+     dict(model="stock", stratum="mid"), "recall_mean", 3),
+    ("8K zero-shot far", "results/crosssite/namsach_ceiling.csv",
+     dict(model="stock", stratum="far"), "recall_mean", 3),
+
+    # --- h50 cua bo 8K o hai dau lot quet (VI tung ghi 110,9 -> 60,5)
+    ("8K h50 @1280 (1 chu so)", "results/crosssite/hd_h50_n5.csv",
+     dict(imgsz="1280"), "h50_native_px", 1),
+    ("8K h50 @3840 (1 chu so)", "results/crosssite/hd_h50_n5.csv",
+     dict(imgsz="3840"), "h50_native_px", 1),
+
+    # --- h50 theo POT giua hai dia diem (VI tung ghi 20,4 so voi 18,7)
+    ("h50 POT danphuong", "results/crosssite/hd_h50_pot.csv",
+     dict(label="danphuong"), "h50_pot_px", 1),
+    ("h50 POT haiphong ha mau", "results/crosssite/hd_h50_pot.csv",
+     dict(label="haiphong_ds1080"), "h50_pot_px", 1),
+
     # --- ngan sach giam sat (Bang tab:supervision)
     ("supervision scale025 far", "results/rebuttal/M4_data_scaling.csv",
      dict(arm="scale025"), "recall_far", 3),

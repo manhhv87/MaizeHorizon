@@ -50,6 +50,28 @@ def tile_grid(W, H, ts, ov):
     return [(x, y) for y in ys for x in xs]
 
 
+def fp_scale_of(items):
+    """He so doi chieu cao pixel goc sang POT, dung cho bo loc kich thuoc FP.
+
+    PHAI trung voi he so dung de phan tang ground truth o `sahi_per_image`, tuc
+    IMGSZ_REF / max(W, H) cua CHINH bo anh dang cham. Truoc day cho nay cung hoa
+    1920 nen tren bo 8K no lech dung 4 lan: ground truth tang xa la hop cao duoi
+    96 px goc (16 / (1280/7680)), con bo loc lai chi coi mot false positive la
+    "tang xa" khi no thap hon 24 px (16 / (1280/1920)). Moi false positive cao
+    24--96 px bi bo qua, nen AP tang xa tren 8K bi thoi phong, va doi chung E5
+    khong con cong bang vi nhanh ha mau 1920x1080 lai duoc cham dung he so.
+
+    Bo anh phai dong nhat kich thuoc; neu khong thi mot he so vo huong la sai va
+    ta dung han thay vi cham nham.
+    """
+    sizes = {(w, h) for _, w, h, _, _ in items}
+    if len(sizes) != 1:
+        raise SystemExit(f"anh khong dong nhat kich thuoc ({len(sizes)} co), "
+                         "khong dung duoc mot he so fp_scale vo huong")
+    w, h = sizes.pop()
+    return IMGSZ_REF / max(w, h)
+
+
 def tile_predict(model, ip, W, H, args):
     """Tiled inference -> NMS-merged predictions in frame coordinates."""
     import cv2
@@ -76,7 +98,15 @@ def tile_predict(model, ip, W, H, args):
                 if int(cl[j]) == args.plant_class:
                     b = xy[j]
                     boxes.append((float(cf[j]), [float(b[0]), float(b[1]), float(b[2]), float(b[3])]))
-    return nms(boxes, args.nms_iou)
+    merged = nms(boxes, args.nms_iou)
+    # Cat ve tran o muc KHUNG. `max_det` o tren ap cho TUNG o, nen khong co buoc nay
+    # thi nhanh cat o duoc ngan sach gap so-o lan nhanh toan khung (~28 o tren bo 8K),
+    # va cau "hai nhanh dung cung mot tran phat hien" trong bai la sai. Giu box theo
+    # do tin cay giam dan, giong cach Ultralytics ap tran cho mot lan suy luan.
+    cap = args.frame_max_det if args.frame_max_det is not None else args.max_det
+    if cap and len(merged) > cap:
+        merged = sorted(merged, key=lambda cb: -cb[0])[:cap]
+    return merged
 
 
 def sahi_per_image(model_path, items, args):
@@ -114,6 +144,19 @@ def run_selftest():
     x0, y0 = 640, 320; bl = [5, 6, 25, 46]
     bg = [bl[0] + x0, bl[1] + y0, bl[2] + x0, bl[3] + y0]
     chk("offset box dung", bg == [645, 326, 665, 366])
+    # 5) he so loc FP phai TRUNG he so phan tang ground truth, tren MOI co anh.
+    #    Day la loi da xay ra that: fp_scale cung hoa 1920 trong khi ground truth
+    #    phan tang theo max(W,H), nen tren bo 8K nguong lech dung 4 lan va AP tang
+    #    xa bi thoi phong. Kiem ca hai co de mot bo dung khong che lap bo kia.
+    for (W, H) in ((1920, 1080), (7680, 4320)):
+        fake = [("x.jpg", W, H, [], [])]
+        chk(f"fp_scale khop scale phan tang o {W}x{H}",
+            abs(fp_scale_of(fake) - IMGSZ_REF / max(W, H)) < 1e-12)
+    # 6) tran o muc khung phai duoc ap sau khi gop o
+    import inspect
+    src = inspect.getsource(tile_predict)
+    chk("tile_predict co cat ve tran muc khung", "frame_max_det" in src)
+
     print(f"\n[SELFTEST] {sum(ok)}/{len(ok)} PASS")
     if not all(ok):
         raise SystemExit("[SELFTEST] FAILED")
@@ -136,7 +179,10 @@ def main():
     ap.add_argument("--add-full", action="store_true", default=True, help="union tiled with full-frame predictions (best case)")
     ap.add_argument("--no-add-full", dest="add_full", action="store_false")
     ap.add_argument("--device", default="0")
-    ap.add_argument("--max-det", type=int, default=1000)
+    ap.add_argument("--max-det", type=int, default=1000, help="tran cho MOI o")
+    ap.add_argument("--frame-max-det", type=int, default=None,
+                    help="tran sau khi gop o; mac dinh bang --max-det de khop nhanh toan khung. "
+                         "Dat 0 de bo cap (hanh vi cu, KHONG khop tran).")
     ap.add_argument("--plant-class", type=int, default=0)
     ap.add_argument("--ignore-class", type=int, default=1)
     ap.add_argument("--weight", default="best.pt", choices=["best.pt", "last.pt"])
@@ -199,7 +245,7 @@ def main():
             # AP tang xa lai la box co kich thuoc tang gan, nen AP tang xa do box lon
             # doan sai chu khong do chat luong phat hien cay xa -- va cat o sinh rat
             # nhieu box lon doan sai, dung o bien o.
-            fps = (IMGSZ_REF / 1920.0) if args.fp_size_filter else None
+            fps = fp_scale_of(items) if args.fp_size_filter else None
             a_s, ng = ap_tier(per_s, s, args.iou, fp_scale=fps)
             a_f, _ = ap_tier(per_f, s, args.iou, fp_scale=fps)
             sahi[s].append(a_s); full[s].append(a_f)

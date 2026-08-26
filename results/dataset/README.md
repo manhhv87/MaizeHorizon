@@ -40,3 +40,33 @@ Zenodo ở dạng đã chia), nên nó ở `_archive/`.
 Sinh bởi `_archive/superseded/cdf_compare.py`. **Không dùng trong bản thảo hiện tại** —
 hình so sánh CDF đã bị bỏ; giữ file lại phòng khi cần dựng lại. Nếu có số nào trong bài
 truy về đây thì đó là lỗi, vì script sinh ra nó đã bị loại khỏi đường tái lập.
+
+## Figure 1 — khung minh hoạ (`paper/figures/maizehorizon_example.{pdf,jpg}`)
+
+Không sinh CSV. Ghi lệnh ở đây vì trước nay hình này **không có lệnh nào được ghi lại**,
+nên không truy được nó dựng từ khung nào — và hoá ra bản cũ dựng từ **bộ nhãn đã bị thay**
+(số đếm trong chú giải không khớp bất kỳ file nhãn hiện hành nào; gần nhất lệch 3 hộp).
+
+```bash
+"$PY" make_teaser.py \
+  --image data/test/images/IMG_3916_f000042.jpg \
+  --label data/test/labels/IMG_3916_f000042.txt \
+  --out paper/figures/maizehorizon_example --lang en
+
+"$PY" make_teaser.py \
+  --image data/test/images/IMG_3916_f000042.jpg \
+  --label data/test/labels/IMG_3916_f000042.txt \
+  --out paper/vi/figures/maizehorizon_example --lang vi
+```
+
+Khung `IMG_3916_f000042` cho **26 gần / 35 giữa / 10 xa** theo bộ nhãn hiện hành — chọn nó
+vì gần bản cũ nhất và có đủ 10 cây tầng xa để inset "khung nhìn xa" có cái để chỉ.
+
+Vẽ bằng matplotlib chứ không phải OpenCV: hộp, chữ, khung inset và đường nối là **vector**,
+chỉ ảnh nền là raster (nó là ảnh chụp). Sau khi ghi PDF, ảnh trong đó được nén lại thành
+JPEG bằng ghostscript mà không đụng phần vector — matplotlib nhúng ảnh dạng PNG không mất
+mát, khiến `main.pdf` phồng từ 1,6 lên 4,0 MB; nén xong còn **0,83 MB**.
+
+⚠️ Trong `.tex` phải ghi rõ đuôi `{maizehorizon_example.pdf}`. Lớp tạp chí này không khai
+báo `\DeclareGraphicsExtensions`, nên khi bỏ đuôi thì graphicx chọn `.jpg` trước `.pdf` và
+bản dựng lặng lẽ dùng ảnh raster.

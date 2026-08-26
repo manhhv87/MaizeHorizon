@@ -156,7 +156,9 @@ def main():
             items.append((ip, w_img, h_img, gt, ig, pid, clip))
     print(f"GT boxes linked to a ledger plant: {linked}, unlinked (treated as singletons): {unlinked}")
 
-    scale0 = a.imgsz / 1920.0
+    # Lay kich thuoc tu chinh anh, khong cung hoa 1920: cung mot cach cung hoa
+    # nhu vay o exp_sahi_baseline.py da lam lech he so 4 lan tren bo 8K.
+    scale0 = a.imgsz / max(items[0][1], items[0][2])
     # A2: distinct plants per tier, from the annotations alone
     tier_plants, tier_boxes = defaultdict(set), defaultdict(int)
     for _, w_img, h_img, gt, _, pid, _ in items:

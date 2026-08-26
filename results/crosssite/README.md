@@ -504,3 +504,21 @@ DS=/media/manhhv/DATA/AI/_archive/paper2/test2_1080
 ```
 
 Tầng xa 8K: 0,193 → 0,478 (+148%). Cùng chiều bản cũ nhưng lớn hơn nhiều.
+
+### ⚠️ Chạy lại 2026-08-26 — hai lỗi trong `exp_sahi_baseline.py`
+
+Mọi CSV cắt ô ở trên đã được **sinh lại** sau khi sửa hai lỗi; bản cũ nằm ở
+`_archive/stale/sahi_fpscale_bug/` kèm giải thích.
+
+1. Hệ số lọc false positive cứng hoá `1920` thay vì lấy từ `max(W, H)` của chính bộ ảnh.
+   Trên 8K nó lệch **4 lần**, bỏ qua mọi false positive cao 24–96 px.
+2. `max_det` chỉ áp cho từng ô, không cắt sau khi gộp — nhánh cắt ô được ngân sách gấp
+   ~28 lần nhánh toàn khung.
+
+Nay `fp_scale_of()` lấy hệ số từ bộ ảnh và **dừng hẳn** nếu ảnh không đồng nhất kích thước;
+`--frame-max-det` cắt sau khi gộp ô, mặc định bằng `--max-det`. Ba phép tự kiểm mới
+(`--selftest`, 9/9) buộc hệ số lọc phải trùng hệ số phân tầng, kiểm ở **cả hai** cỡ ảnh.
+
+**Kết quả đổi hẳn:** AP tầng xa trên 8K từ `0,193 → 0,478` (+148%) thành `0,180 → 0,163`
+(−9%). Phép đảo dấu không tồn tại — cắt ô làm giảm AP tầng xa ở mọi điều kiện đã thử.
+Đối chứng E5 co từ +0,361 xuống +0,060 (p=0,014).
