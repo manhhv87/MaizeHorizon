@@ -141,8 +141,14 @@ def ap_tier(per_image, tier, iou_thr, return_curve=False, fp_scale=None):
     return coco_ap(rec, prec), n_target
 
 
-def predictions_for(model_path, items, args):
-    """Run one checkpoint -> per_image: (gts_with_tier, ignores, preds)."""
+def predictions_for(model_path, items, args, diag=None):
+    """Run one checkpoint -> per_image: (gts_with_tier, ignores, preds).
+
+    `diag`: neu dua vao mot list, moi khung se them mot ban ghi
+    (arm, frame, tile_idx, n_all_classes, n_plant, max_det, hit_cap). `n_all_classes`
+    la so box Ultralytics tra ve TRUOC khi ta loc class plant -- do la con so duy nhat
+    doi chieu duoc voi `max_det`, vi tran ay ap cho ca hai class.
+    """
     from ultralytics import YOLO
     model = YOLO(model_path)
     per_image = []
@@ -152,11 +158,16 @@ def predictions_for(model_path, items, args):
         r = model.predict(ip, conf=args.conf, iou=0.6, imgsz=args.imgsz,
                           device=args.device, max_det=args.max_det, verbose=False)[0]
         preds = []
+        n_all = 0
         if r.boxes is not None and len(r.boxes):
             cl = r.boxes.cls.cpu().numpy(); xy = r.boxes.xyxy.cpu().numpy(); cf = r.boxes.conf.cpu().numpy()
+            n_all = len(cl)
             for j in range(len(cl)):
                 if int(cl[j]) == args.plant_class:
                     preds.append((float(cf[j]), xy[j].tolist()))
+        if diag is not None:
+            diag.append(("full", os.path.basename(ip), -1, n_all, len(preds),
+                         args.max_det, int(n_all >= args.max_det)))
         per_image.append((gts, [b[:4] for b in ignores], preds))
     return per_image
 

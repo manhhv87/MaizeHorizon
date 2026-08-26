@@ -97,32 +97,49 @@ def fp_scale_of(items):
     return IMGSZ_REF / max(w, h)
 
 
-def tile_predict(model, ip, W, H, args):
-    """Tiled inference -> NMS-merged predictions in frame coordinates."""
+def tile_predict(model, ip, W, H, args, diag=None):
+    """Tiled inference -> NMS-merged predictions in frame coordinates.
+
+    `diag`: nhu predictions_for, moi O mot ban ghi. Phai dem so box MOI CLASS truoc
+    khi loc plant, vi `max_det` cua Ultralytics ap len ca hai class; dem sau khi loc
+    thi khong bao gio bang max_det va cau hoi "tran co cham khong" khong tra loi duoc.
+    """
     import cv2
     im = cv2.imread(ip)
     ts = min(args.tile, W, H)
     boxes = []
-    for (x0, y0) in tile_grid(W, H, ts, args.overlap):
+    for _ti, (x0, y0) in enumerate(tile_grid(W, H, ts, args.overlap)):
         tile = im[y0:y0 + ts, x0:x0 + ts]
         r = model.predict(tile, conf=args.conf, iou=0.6, imgsz=args.imgsz,
                           device=args.device, max_det=args.max_det, verbose=False)[0]
+        _n_all, _n_pl = 0, 0
         if r.boxes is not None and len(r.boxes):
             cl = r.boxes.cls.cpu().numpy(); xy = r.boxes.xyxy.cpu().numpy(); cf = r.boxes.conf.cpu().numpy()
+            _n_all = len(cl)
             for j in range(len(cl)):
                 if int(cl[j]) == args.plant_class:
+                    _n_pl += 1
                     b = xy[j]
                     boxes.append((float(cf[j]), [float(b[0]) + x0, float(b[1]) + y0,
                                                  float(b[2]) + x0, float(b[3]) + y0]))
+        if diag is not None:
+            diag.append(("tile", os.path.basename(ip), _ti, _n_all, _n_pl,
+                         args.max_det, int(_n_all >= args.max_det)))
     if args.add_full:
         r = model.predict(ip, conf=args.conf, iou=0.6, imgsz=args.imgsz,
                           device=args.device, max_det=args.max_det, verbose=False)[0]
+        _n_all, _n_pl = 0, 0
         if r.boxes is not None and len(r.boxes):
             cl = r.boxes.cls.cpu().numpy(); xy = r.boxes.xyxy.cpu().numpy(); cf = r.boxes.conf.cpu().numpy()
+            _n_all = len(cl)
             for j in range(len(cl)):
                 if int(cl[j]) == args.plant_class:
+                    _n_pl += 1
                     b = xy[j]
                     boxes.append((float(cf[j]), [float(b[0]), float(b[1]), float(b[2]), float(b[3])]))
+        if diag is not None:
+            diag.append(("tile_addfull", os.path.basename(ip), -1, _n_all, _n_pl,
+                         args.max_det, int(_n_all >= args.max_det)))
     merged = nms(boxes, args.nms_iou)
     # Tran o muc KHUNG, MAC DINH TAT.
     #
@@ -149,7 +166,7 @@ tile_predict.n_merged = []
 tile_predict.n_capped = 0
 
 
-def sahi_per_image(model_path, items, args):
+def sahi_per_image(model_path, items, args, diag=None):
     """per_image [(gts_with_tier, ignores, preds)] using tiled predictions."""
     from ultralytics import YOLO
     model = YOLO(model_path)
@@ -157,7 +174,7 @@ def sahi_per_image(model_path, items, args):
     for ip, w, h, plants, ignores in items:
         scale = IMGSZ_REF / max(w, h)                       # tier o imgsz tham chieu (giong baseline)
         gts = [(b[:4], stratum(b, "pot", scale)) for b in plants]
-        preds = tile_predict(model, ip, w, h, args)
+        preds = tile_predict(model, ip, w, h, args, diag=diag)
         out.append((gts, [b[:4] for b in ignores], preds))
     return out
 
@@ -243,6 +260,11 @@ def main():
     ap.add_argument("--no-add-full", dest="add_full", action="store_false")
     ap.add_argument("--device", default="0")
     ap.add_argument("--max-det", type=int, default=1000, help="tran cho MOI o")
+    ap.add_argument("--diag-out", default=None,
+                    help="CSV chan doan tran: moi lan predict mot dong (seed, khung, nhanh, "
+                         "chi so o, so box moi class, so box plant, max_det, cham tran). "
+                         "Day la cach DUY NHAT kiem duoc `max_det` cua Ultralytics co rang "
+                         "buoc hay khong -- tran ay ap TRUOC khi ta loc class plant.")
     ap.add_argument("--frame-max-det", type=int, default=0,
                     help="tran sau khi gop o; 0 = khong cat (mac dinh). Chi dat khac 0 khi "
                          "da kiem rang nhanh toan khung cung bi tran do rang buoc.")
@@ -298,10 +320,15 @@ def main():
         setattr(fa, k, v)
     fa.imgsz = args.imgsz
 
+    diag_rows = []
     for cp in cps:
         print(f"  [{cp}] tiling ...")
-        per_s = sahi_per_image(cp, items, args)
-        per_f = predictions_for(cp, items, fa)
+        _d = [] if args.diag_out else None
+        per_s = sahi_per_image(cp, items, args, diag=_d)
+        per_f = predictions_for(cp, items, fa, diag=_d)
+        if _d is not None:
+            seed = os.path.basename(os.path.dirname(os.path.dirname(cp)))
+            diag_rows.extend([seed] + list(r) for r in _d)
         for s in STRATA:
             # fp_scale: chi tinh mot prediction la false positive cua tang dang xet
             # khi chinh no thuoc tang do (kieu COCO). Khong co no, 88,6% FP tinh vao
@@ -317,14 +344,31 @@ def main():
         if ngt is None:
             ngt = {s: ap_tier(per_s, s, args.iou)[1] for s in STRATA}
 
-    # Chan doan tran: mot tran chi la confound khi no CHAM. In ra de moi lan chay
-    # deu kiem lai duoc, thay vi tin vao gia tri mac dinh.
+    # Chan doan tran. Mot tran chi la confound khi no CHAM, va cai co the cham o day
+    # la `max_det` cua Ultralytics, ap cho MOI lan predict truoc khi ta loc class
+    # plant -- khong phai tran sau-gop (mac dinh tat, nen bo dem cua no bang 0 theo
+    # dinh nghia va khong chung minh duoc gi).
+    if diag_rows:
+        hdr = ["seed", "arm", "frame", "tile_idx", "n_all_classes", "n_plant",
+               "max_det", "hit_cap"]
+        os.makedirs(os.path.dirname(args.diag_out) or ".", exist_ok=True)
+        with open(args.diag_out, "w", newline="", encoding="utf-8") as f:
+            w_ = csv.writer(f); w_.writerow(hdr); w_.writerows(diag_rows)
+        print(f"\n[tran] chan doan -> {args.diag_out}")
+        for arm in ("full", "tile", "tile_addfull"):
+            rs = [r for r in diag_rows if r[1] == arm]
+            if not rs:
+                continue
+            na = [r[4] for r in rs]; npl = [r[5] for r in rs]; hc = sum(r[7] for r in rs)
+            print(f"  {arm:13s} {len(rs):>6} lan predict | box moi class: tb "
+                  f"{sum(na)/len(na):7.1f}, max {max(na):5d} | plant: tb {sum(npl)/len(npl):7.1f}"
+                  f" | cham max_det={args.max_det}: {hc}/{len(rs)}")
     nm = tile_predict.n_merged
     if nm:
         import statistics
-        print(f"\n[tran] cat o: {statistics.mean(nm):.0f} box/khung trung binh, "
-              f"lon nhat {max(nm)} | --frame-max-det={args.frame_max_det or 'tat'} "
-              f"| so khung bi cat: {tile_predict.n_capped}/{len(nm)}")
+        print(f"  {'sau gop+NMS':13s} {len(nm):>6} khung        | plant/khung: tb "
+              f"{statistics.mean(nm):7.1f}, max {max(nm):5d} | --frame-max-det="
+              f"{args.frame_max_det or 'tat'}, bi cat {tile_predict.n_capped}/{len(nm)}")
 
     rows = [["tier", "n_gt", "full_ap_mean", "full_ap_std", "sahi_ap_mean", "sahi_ap_std", "delta_sahi_minus_full", "n_seeds"]]
     print("\n=== AP per-tier: FULL (baseline) vs SAHI (tiled) ===")

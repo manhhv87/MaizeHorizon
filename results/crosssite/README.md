@@ -531,14 +531,62 @@ box/khung trên trần 3 000, 0/12 khung), trong khi trần mới cắt cụt nh
 `max_det` cho **cả hai class** rồi ta mới lọc plant, nên nhánh toàn khung "tiêu" ngân sách cho cả
 lớp ignore (~66% số box trên bộ 8K) — vô hại ở đây vì trần không chạm.
 
-Nay trần khung **mặc định tắt**, và script in chẩn đoán mỗi lần chạy để kiểm lại thay vì tin vào
-mặc định:
+Nay trần khung **mặc định tắt**.
 
-| Lô | Box/khung | Lớn nhất | Bị cắt |
+⚠️ **Bản chẩn đoán đầu tiên vô giá trị.** Nó đếm số khung bị cắt bởi *trần sau-gộp*, mà trần ấy
+mặc định tắt — nên bộ đếm bằng 0 **theo định nghĩa**, không chứng minh được gì. Trần thực sự có
+thể ràng buộc là `max_det` của Ultralytics, áp cho **mỗi lần predict** (từng ô và toàn khung)
+**trước** khi ta lọc lấy class plant. Đó mới là cái phải đo, và phải đếm box **mọi class** — đếm
+sau khi lọc thì không bao giờ bằng `max_det`.
+
+`--diag-out` ghi mỗi lần predict một dòng: `seed, arm, frame, tile_idx, n_all_classes, n_plant,
+max_det, hit_cap`.
+
+```bash
+"$PY" exp_sahi_baseline.py --labels-dir "$LAB2" --images-dir "$IMG2" --runs runs \
+  --tag stock --seeds 0 1 2 3 4 --tile 1280 --imgsz 1280 --overlap 0.2 \
+  --iou 0.3 --conf 0.001 --max-det 3000 --device 0 --fp-size-filter \
+  --out results/crosssite/capctl_hd_sahi_md3000.csv \
+  --per-seed-out results/crosssite/capctl_hd_perseed_md3000.csv \
+  --diag-out results/crosssite/capctl_diag_md3000.csv
+
+"$PY" exp_sahi_baseline.py --labels-dir "$LAB2" --images-dir "$IMG2" --runs runs \
+  --tag stock --seeds 0 1 2 3 4 --tile 1280 --imgsz 1280 --overlap 0.2 \
+  --iou 0.3 --conf 0.001 --max-det 6000 --device 0 --fp-size-filter \
+  --out results/crosssite/capctl_hd_sahi_md6000.csv \
+  --per-seed-out results/crosssite/capctl_hd_perseed_md6000.csv \
+  --diag-out results/crosssite/capctl_diag_md6000.csv
+
+"$PY" exp_sahi_baseline.py --labels-dir "$LAB2" --images-dir "$IMG2" --runs runs \
+  --tag stock --seeds 0 1 2 3 4 --tile 1280 --imgsz 1280 --overlap 0.2 \
+  --iou 0.3 --conf 0.001 --max-det 12000 --device 0 --fp-size-filter \
+  --out results/crosssite/capctl_hd_sahi_md12000.csv \
+  --per-seed-out results/crosssite/capctl_hd_perseed_md12000.csv \
+  --diag-out results/crosssite/capctl_diag_md12000.csv
+```
+
+### Trần có ràng buộc không — bộ 8K, 150 khung × 5 seed
+
+| Nhánh | Lần predict | Box mọi class (tb) | **Lớn nhất** | Chạm `max_det=3000` |
+|---|---|---|---|---|
+| toàn khung | 750 | 1 342,5 | 1 937 | **0** |
+| từng ô | 24 000 | 408,8 | **2 047** | **0** |
+| toàn khung trong SAHI | 750 | 1 342,5 | 1 937 | **0** |
+
+**25 500 lần predict, 0 lần chạm trần.** Con số quyết định là *lớn nhất* chứ không phải trung
+bình: cao nhất 2 047 trên trần 3 000.
+
+Nhân trần lên 4 lần không đổi gì — ba file AP **trùng md5** (`100a900a081dcc2490cd63e05800f5c7`):
+
+| `max_det` | full far AP | sahi far AP | Δ |
 |---|---|---|---|
-| 1080p | 547 | 975 | 0/600 |
-| 8K gốc | 4 139 | 10 543 | 0/750 |
-| 8K hạ mẫu | 2 765 | 6 208 | 0/750 |
+| 3 000 | 0,179600 | 0,165200 | −0,014300 |
+| 6 000 | 0,179600 | 0,165200 | −0,014300 |
+| 12 000 | 0,179600 | 0,165200 | −0,014300 |
+
+Đây mới là bằng chứng "trần không ràng buộc". Sau khi gộp ô và NMS, nhánh cắt ô cho 4 139
+box/khung (lớn nhất 10 543) — nhiều hơn nhánh toàn khung, nhưng vì **không bên nào bị trần cắt**
+nên hai bên vẫn so sánh được.
 
 `nms()` cũng chuyển sang `torchvision.ops.nms`: cùng thuật toán tham lam, cùng thứ tự, cùng
 ngưỡng, **tập box giữ lại trùng khít** (kiểm ở N=2000 và N=6000, và `--selftest` kiểm mỗi lần
