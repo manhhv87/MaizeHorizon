@@ -1,7 +1,7 @@
 # MaizeHorizon
 
 Measuring the binding resolution in far-field per-plant maize detection: network
-input size does not extend range.
+input size extends range only when the input binds.
 
 A forward-facing camera driving down a crop row turns per-plant detection into a
 far-field small-object problem — a distant seedling spans a handful of pixels and
@@ -13,25 +13,34 @@ would have exposed a real effect.
 ## Key result
 
 Detectability is bounded by the **lesser** of the pixels the sensor resolves on
-the plant and the pixels the network input carries. Which one binds is measurable:
-raise the input in steps and find where half-recall stops improving.
+the plant and the pixels the network input carries. Which one binds is
+measurable: raise the input in steps and find where half-recall stops improving.
 
-| Rig | Nominal | Saturates at | Effective resolution |
+| Rig | Nominal | Half-recall stops improving at | Binding cap |
 |---|---|---|---|
-| Logitech C920, Dan Phuong | 1920 | input ≈ 960 | ≤ 960–1280 |
-| Samsung S23 8K, Nam Sach | 7680 | input ≈ 2560–3840 | ≈ 2560–3840 |
+| Logitech C920, Dan Phuong | 1920 | its native 1920 | sensor |
+| Samsung S23 8K, Nam Sach | 7680 | ≈ 2560 | network input |
 
-On the webcam the **sensor** binds: recall by native box height is equivalent
-across inputs ≥ 960 within ±0.073, half-recall near a 52 px native box, and
-retraining at native 1920 gains nothing. On the 8K camera the **input** binds
-instead — raising it lifts recall on a 60 px native plant from 0.088 to 0.496 and
-extends half-recall range from 4.6 to 7.8 m on unchanged footage.
+On the webcam the **sensor** binds. Half-recall sits near a 52 px native box,
+pushing the input past native returns nothing on any arm, and retraining at
+native 1920 gains nothing either. Equivalence across inputs is close but not
+established: 15 of 24 cells pass a ±0.05 margin, 23 of 24 at ±0.075.
 
-The saturation point measures the detail a camera really delivers, which need not
-match its megapixel count. Two further measurements agree that the 8K frames
-carry nearer 2560 px of real detail: the power spectrum of the raw frames, and
-the sign of sliced inference, which loses 85% far AP where the sensor is
-exhausted and gains 143% where it is not.
+On the 8K camera the **input** binds instead. Raising it from 1280 to 3840 lifts
+recall on a 48–64 px native plant from 0.062 to 0.419 and extends half-recall
+range from 4.6 to 7.7 m on unchanged footage, saturating near 2560.
+
+That saturation point measures the detail a camera really delivers, which need
+not match its megapixel count: a nominal 7680 px frame carries nearer 2560 px of
+real detail. The raw-frame power spectrum agrees, retaining 0.122 of its
+low-frequency power at a matched angular frequency against 0.024 for the webcam.
+
+Six remedies that re-use already-captured pixels fail to move the floor,
+including sliced inference, which costs far-tier AP on **both** cameras (−68%
+where the sensor binds, −8% and unresolved where the input binds). The one that
+helps changes the learning objective rather than the pixel budget: a Normalized
+Wasserstein regression term lowers the floor by 5 px, then saturates at native
+resolution like everything else.
 
 ## Dataset
 
@@ -47,8 +56,8 @@ campaigns that differ in locality, season and camera:
 | Far tier at input 1280 | 82 | 5,790 |
 | … of which sub-12 px POT | 4 | 2,324 |
 
-The first also ships 28 clips and 5,979 unlabelled frames. The second is held out
-entirely: never trained on, evaluation only.
+The first campaign also ships 28 forward-motion clips of unlabelled frames. The
+second is held out entirely: never trained on, evaluation only.
 
 Download: [doi:10.5281/zenodo.21775698](https://doi.org/10.5281/zenodo.21775698)
 (CC BY 4.0). Cite that concept DOI rather than a version-specific one. Both
@@ -57,7 +66,6 @@ archives unpack into a single `data/` directory.
 ## Install
 
 ```bash
-git lfs install                  # the checkpoints are stored via Git LFS
 git clone https://github.com/manhhv87/MaizeHorizon.git
 cd MaizeHorizon
 pip install -r requirements.txt  # ultralytics 8.3.160 + torch
@@ -66,38 +74,63 @@ tar -xf  MaizeHorizon-images.tar
 tar -xzf MaizeHorizon-annotations.tar.gz
 ```
 
-The trained checkpoints sit in `runs/` via Git LFS, so every reported number can be
-recomputed from them without retraining. Cloning without Git LFS leaves the weights
-as pointer files.
+Neither the checkpoints nor the result CSVs are in the repository. Train the
+checkpoints first (below), then regenerate every number from them.
 
 ## Reproducing
 
-`python rerun_after_relabel.py` regenerates every table into `results/` and holds
-the exact arguments for each step. Training entry points are `train.py` (stock and
-nearfar arms), `train_tbxrd_stage2.py` (distillation), `train_nwd.py`, and
-`exp_multiarch_train.py`.
+```bash
+python train_missing_seeds.py --seeds 0 1 2 3 4 --workers 2 --device 0
+python reproduce_all.py                          # writes results/
+```
 
-Two things to know. `max_det` differs by script: 300 for recall and precision
-tables, 1000 for AP and the resolution sweep, and **3,000 for anything on Nam
-Sach**, which averages 238 annotated plants per frame against 34 for Dan Phuong.
-And `n_gt` should read 4,067 = 2,747 / 1,238 / 82 for Dan Phuong, 29,297 =
-11,775 / 11,732 / 5,790 for Nam Sach.
+`train_missing_seeds.py` detects which arms are short of seeds and trains only
+those, appending to `results/rebuttal/seed_manifest.csv` after **each** run.
+Per-arm hyperparameters live in the script's `ARMS` table; where
+`runs/<tag>_s0/args.yaml` already exists, `batch`, `imgsz` and `patience` are
+read from it instead, so new seeds match the old ones.
 
-`reproduce_all.py` holds the cross-site commands, and the notes below list the
-interpretation traps worth reading before quoting any number.
+`rerun_after_relabel.py` is the narrower path: it regenerates only what depends
+on the test labels, and records the exact arguments for each step. Training
+entry points are `train.py` (stock and +Mint arms), `train_tbxrd_stage2.py`
+(distillation), `train_nwd.py` and `exp_multiarch_train.py`.
+
+Two things to know before quoting any number. `max_det` differs by script: 300
+for the recall and precision tables, 1000 for AP and the resolution sweep, and
+**3,000 for anything on Nam Sach**, which averages 239 annotated boxes per frame
+against 42 for Dan Phuong. And `n_gt` should read 4,067 = 2,747 / 1,238 / 82 for
+Dan Phuong, 29,297 = 11,775 / 11,732 / 5,790 for Nam Sach.
+
+⚠️ `--workers 2`: the default of 8 causes a fork deadlock between OpenCV and the
+DataLoader on some machines — training stalls after a few epochs with the GPU at
+0% and no error.
+
+⚠️ Ultralytics picks `best.pt` by fitness = `0.1·mAP50 + 0.9·mAP50-95`, so a
+validation spike during warmup can freeze it at epoch 2 and stop early. Seen
+once: the checkpoint lost 21% mid-tier AP and 62% far-tier AP with no other
+sign. Check after training:
+
+```bash
+python -c "import csv,sys;r=list(csv.DictReader(open(sys.argv[1])));\
+k50=[c for c in r[0] if 'mAP50(B)' in c and '95' not in c][0];\
+k95=[c for c in r[0] if 'mAP50-95(B)' in c][0];\
+v=[0.1*float(x[k50])+0.9*float(x[k95]) for x in r];\
+e=v.index(max(v))+1;print('best @epoch',e,'/',len(v),'<-- SUSPECT' if e<=5 else '')" \
+  runs/<tag>_s<n>/results.csv
+```
 
 ## Layout
 
 | Path | Role |
 |---|---|
 | `data/` | frames, test labels, per-arm label sets, minted labels — not in the repository; created by unpacking the Zenodo archives |
-| `results/` | written by the scripts; not in the repository |
-| `runs/<tag>_s<seed>/` | `weights/best.pt` (Git LFS), `args.yaml`, `results.csv` |
+| `runs/<tag>_s<seed>/` | `weights/best.pt`, `args.yaml`, `results.csv` — not in the repository; written by training |
+| `results/` | every reported number, as CSV — not in the repository; written by the scripts |
 | `eval_testset.py`, `eval_ap.py`, `rebuttal_common.py` | the evaluation protocol |
 | `exp_*.py` | resolution sweep, equivalence, contrast, range-matched, clustered CIs |
 | `train*.py`, `tbxrd_mint.py` | training and the forward-motion remedies |
-| `plot_*.py`, `make_paper_figures.py` | figures |
-| `exp_range_validation.py`, `scripts/` | metric-distance validation, sensor ablation, Word build |
+| `plot_*.py`, `make_paper_figures.py`, `make_tables.py` | figures and tables |
+| `scripts/` | sensor downsampling, Word build |
 
 Each arm's `images/` is a symlink to `data/images`, so no image bytes are
 duplicated.
@@ -107,7 +140,8 @@ duplicated.
 ```bibtex
 @article{maizehorizon,
   title  = {Measuring the binding resolution in far-field per-plant maize
-            detection: network input size does not extend range},
+            detection: network input size extends range only when the input
+            binds},
   author = {Hoang, Manh V. and Nguyen, Truong Q.},
   year   = {2026}
 }
@@ -127,38 +161,3 @@ duplicated.
 Code is AGPL-3.0, inherited from
 [Ultralytics YOLO](https://github.com/ultralytics/ultralytics). The dataset is
 CC BY 4.0.
-
-## Checkpoint
-
-Trọng số **không** nằm trong repo. 75 checkpoint (15 nhánh × 5 seed) là ~1,6 GB, vượt
-hạn mức LFS miễn phí, và không cần để đọc bài. Dựng lại:
-
-```bash
-python train_missing_seeds.py --seeds 0 1 2 3 4 --workers 2 --device 0
-```
-
-Script dò nhánh nào thiếu seed và chỉ train phần thiếu, ghi
-`results/rebuttal/seed_manifest.csv` sau **mỗi** lượt. Siêu tham số của từng nhánh nằm
-trong bảng `ARMS` của chính script; nếu `runs/<tag>_s0/args.yaml` còn trên máy thì
-`batch`, `imgsz` và `patience` được đọc từ đó thay vì lấy bảng, để seed mới khớp seed cũ.
-
-⚠️ `--workers 2`: mặc định 8 gây deadlock fork giữa OpenCV và DataLoader trên một số máy —
-training đứng hẳn sau vài epoch, GPU 0%, không báo lỗi nào.
-
-⚠️ `best.pt` được ultralytics chọn theo fitness = `0.1·mAP50 + 0.9·mAP50-95`, và một cú
-nhiễu validation trong giai đoạn warmup có thể khiến nó chốt ở epoch 2 rồi dừng sớm. Đã
-gặp một lần: checkpoint mất 21% AP tầng giữa và 62% AP tầng xa mà không có dấu hiệu gì.
-Kiểm sau khi train:
-
-```bash
-python -c "import csv,sys;r=list(csv.DictReader(open(sys.argv[1])));\
-k50=[c for c in r[0] if 'mAP50(B)' in c and '95' not in c][0];\
-k95=[c for c in r[0] if 'mAP50-95(B)' in c][0];\
-v=[0.1*float(x[k50])+0.9*float(x[k95]) for x in r];\
-e=v.index(max(v))+1;print('best @epoch',e,'/',len(v),'<-- NGHI NGO' if e<=5 else '')" \
-  runs/<tag>_s<n>/results.csv
-```
-
-CSV kết quả **không** nằm trong repo: chạy `python reproduce_all.py` (hoặc
-`rerun_after_relabel.py`) để sinh lại toàn bộ vào `results/` từ checkpoint trong `runs/`,
-không cần train lại.
