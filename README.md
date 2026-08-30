@@ -84,16 +84,11 @@ python train_missing_seeds.py --seeds 0 1 2 3 4 --workers 2 --device 0
 python reproduce_all.py                          # writes results/
 ```
 
-`train_missing_seeds.py` detects which arms are short of seeds and trains only
-those, appending to `results/rebuttal/seed_manifest.csv` after **each** run.
-Per-arm hyperparameters live in the script's `ARMS` table; where
-`runs/<tag>_s0/args.yaml` already exists, `batch`, `imgsz` and `patience` are
-read from it instead, so new seeds match the old ones.
-
-`rerun_after_relabel.py` is the narrower path: it regenerates only what depends
-on the test labels, and records the exact arguments for each step. Training
-entry points are `train.py` (stock and +Mint arms), `train_tbxrd_stage2.py`
-(distillation), `train_nwd.py` and `exp_multiarch_train.py`.
+`train_missing_seeds.py` trains only the arms that are short of seeds; per-arm
+hyperparameters live in its `ARMS` table. Training entry points are `train.py`
+(stock and +Mint arms), `train_tbxrd_stage2.py` (distillation), `train_nwd.py`
+and `exp_multiarch_train.py`. `rerun_after_relabel.py` is the narrower path: it
+regenerates only what depends on the test labels.
 
 Two things to know before quoting any number. `max_det` differs by script: 300
 for the recall and precision tables, 1000 for AP and the resolution sweep, and
@@ -105,26 +100,12 @@ Dan Phuong, 29,297 = 11,775 / 11,732 / 5,790 for Nam Sach.
 DataLoader on some machines — training stalls after a few epochs with the GPU at
 0% and no error.
 
-⚠️ Ultralytics picks `best.pt` by fitness = `0.1·mAP50 + 0.9·mAP50-95`, so a
-validation spike during warmup can freeze it at epoch 2 and stop early. Seen
-once: the checkpoint lost 21% mid-tier AP and 62% far-tier AP with no other
-sign. Check after training:
-
-```bash
-python -c "import csv,sys;r=list(csv.DictReader(open(sys.argv[1])));\
-k50=[c for c in r[0] if 'mAP50(B)' in c and '95' not in c][0];\
-k95=[c for c in r[0] if 'mAP50-95(B)' in c][0];\
-v=[0.1*float(x[k50])+0.9*float(x[k95]) for x in r];\
-e=v.index(max(v))+1;print('best @epoch',e,'/',len(v),'<-- SUSPECT' if e<=5 else '')" \
-  runs/<tag>_s<n>/results.csv
-```
-
 ## Layout
 
 | Path | Role |
 |---|---|
 | `data/` | frames, test labels, per-arm label sets, minted labels — not in the repository; created by unpacking the Zenodo archives |
-| `runs/<tag>_s<seed>/` | `weights/best.pt`, `args.yaml`, `results.csv` — not in the repository; written by training |
+| `runs/<tag>_s<seed>/` | trained weights — not in the repository; written by training |
 | `results/` | every reported number, as CSV — not in the repository; written by the scripts |
 | `eval_testset.py`, `eval_ap.py`, `rebuttal_common.py` | the evaluation protocol |
 | `exp_*.py` | resolution sweep, equivalence, contrast, range-matched, clustered CIs |
