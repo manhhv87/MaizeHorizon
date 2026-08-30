@@ -1,3 +1,0 @@
-arm,n_train_frames,fraction,recall_near,std_near,recall_mid,std_mid,recall_far,std_far
-farx20,3349,20.00,0.9852,0.0025,0.7614,0.0492,0.3195,0.0594
-nearfar,3349,1.00,0.9886,0.0038,0.7895,0.0123,0.3122,0.0139

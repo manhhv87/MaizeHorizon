@@ -1,9 +1,0 @@
-dataset,cite,Per-plant maize,Forward-to-horizon,Quantified far tier,Ignore class,Clip-disjoint splits,Count ledger,Multi-site,source
-GWHD,david2020gwhd,no,no,no,no,no,no,yes,lua mi khong phai ngo; nadir/oblique; nhieu site va quoc gia -> chi Multi-site la cmark
-Veridis,veridis2026,yes,no,no,no,no,no,no,"per-plant maize co; viewpoint under-represents far tier; khong CDF far, khong ignore/splits/ledger"
-CropFollow,sivakumar2021cropfollow,no,yes,no,no,no,no,no,"forward-facing ground robot (chia ego-motion) NHUNG la nav/row, KHONG per-plant box"
-CRDLD,desilva2024croprow,no,no,no,no,no,no,no,"crop-ROW detection (low density), khong per-plant; khong dat far-tier/ignore/splits/ledger"
-MSDD,kharismawati2025msdd,yes,no,no,no,no,no,no,"per-plant seedling box NHUNG early-stage, near-nadir/short-range (khong to-horizon)"
-CornWeed,iqbal2023cornweed,yes,no,no,no,no,no,no,per-instance maize/weed; geometry khong forward-to-horizon; khong far-tier/ignore/splits/ledger
-WeedMaize,lopezcorrea2021weedmaize,yes,no,no,no,no,no,no,per-instance maize/weed; tuong tu CornWeed; khong release count ledger
-MaizeHorizon (ours),,yes,yes,yes,yes,yes,yes,yes,auto-verify tu artifact that

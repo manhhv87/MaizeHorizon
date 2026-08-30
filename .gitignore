@@ -270,3 +270,11 @@ _docx_build/
 *.md.local
 [A-Z]*.md
 !README.md
+
+# ket qua chay (CSV + README cua tung nhom): sinh lai bang reproduce_all.py,
+# khong day len GitHub
+results/
+
+# bo soat ban thao: chi dung o may, khong thuoc duong tai lap ket qua
+check_*.py
+restructure_*.py

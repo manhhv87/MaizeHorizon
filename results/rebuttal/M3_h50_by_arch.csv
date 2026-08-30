@@ -1,5 +1,0 @@
-arch,imgsz,h50_native_px,n_bins_used
-rtdetr-l,640,33.10,6
-rtdetr-l,960,29.41,6
-rtdetr-l,1280,30.35,6
-rtdetr-l,1920,32.45,6

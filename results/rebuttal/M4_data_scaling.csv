@@ -1,4 +1,0 @@
-arm,n_train_frames,fraction,recall_near,std_near,recall_mid,std_mid,recall_far,std_far
-scale025,837,0.25,0.9884,0.0024,0.8271,0.0487,0.4195,0.0625
-scale050,1674,0.50,0.9904,0.0025,0.8244,0.0288,0.3902,0.0525
-nearfar,3349,1.00,0.9886,0.0038,0.7895,0.0123,0.3122,0.0139

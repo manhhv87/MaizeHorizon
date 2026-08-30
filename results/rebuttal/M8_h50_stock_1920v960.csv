@@ -1,3 +1,0 @@
-conf,tag_a,imgsz_a,tag_b,imgsz_b,n_seeds,n_plant,h50_a,h50_b,delta,delta_lo,delta_hi,p_boot,ket_luan
-0.25,stock,1920,stock,960,5,988,44.08,49.75,-5.66,-6.97,-4.61,0.0005,KHAC
-0.001,stock,1920,stock,960,5,988,20.87,23.7,-2.83,-4.3,-1.11,0.0005,KHAC

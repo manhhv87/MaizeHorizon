@@ -66,13 +66,13 @@ tar -xf  MaizeHorizon-images.tar
 tar -xzf MaizeHorizon-annotations.tar.gz
 ```
 
-The 36 trained checkpoints (12 arms × 3 seeds, 916 MB) sit in `runs/` via Git LFS,
-so every number in `results/` can be checked without retraining. Cloning without
-Git LFS leaves the weights as pointer files.
+The trained checkpoints sit in `runs/` via Git LFS, so every reported number can be
+recomputed from them without retraining. Cloning without Git LFS leaves the weights
+as pointer files.
 
 ## Reproducing
 
-`python rerun_after_relabel.py` regenerates every table in `results/` and holds
+`python rerun_after_relabel.py` regenerates every table into `results/` and holds
 the exact arguments for each step. Training entry points are `train.py` (stock and
 nearfar arms), `train_tbxrd_stage2.py` (distillation), `train_nwd.py`, and
 `exp_multiarch_train.py`.
@@ -83,15 +83,15 @@ Sach**, which averages 238 annotated plants per frame against 34 for Dan Phuong.
 And `n_gt` should read 4,067 = 2,747 / 1,238 / 82 for Dan Phuong, 29,297 =
 11,775 / 11,732 / 5,790 for Nam Sach.
 
-`results/crosssite/README.md` holds the cross-site commands and four
-interpretation traps worth reading before quoting any number from them.
+`reproduce_all.py` holds the cross-site commands, and the notes below list the
+interpretation traps worth reading before quoting any number.
 
 ## Layout
 
 | Path | Role |
 |---|---|
 | `data/` | frames, test labels, per-arm label sets, minted labels — not in the repository; created by unpacking the Zenodo archives |
-| `results/` | every reported number, as CSV |
+| `results/` | written by the scripts; not in the repository |
 | `runs/<tag>_s<seed>/` | `weights/best.pt` (Git LFS), `args.yaml`, `results.csv` |
 | `eval_testset.py`, `eval_ap.py`, `rebuttal_common.py` | the evaluation protocol |
 | `exp_*.py` | resolution sweep, equivalence, contrast, range-matched, clustered CIs |
@@ -159,6 +159,6 @@ e=v.index(max(v))+1;print('best @epoch',e,'/',len(v),'<-- NGHI NGO' if e<=5 else
   runs/<tag>_s<n>/results.csv
 ```
 
-Toàn bộ CSV kết quả **có** trong repo, nên mọi con số trong bài kiểm chứng được mà không
-cần train lại. `python check_traceability.py --strict` xác nhận mỗi CSV truy được về một
-lệnh đã ghi.
+CSV kết quả **không** nằm trong repo: chạy `python reproduce_all.py` (hoặc
+`rerun_after_relabel.py`) để sinh lại toàn bộ vào `results/` từ checkpoint trong `runs/`,
+không cần train lại.

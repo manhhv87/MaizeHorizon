@@ -12,8 +12,7 @@ khong gi bao loi. Da dinh dung mot lan: sau khi nang tu 3 len 5 seed, bon bang v
 giu nguyen so cu, trong do co o ghi `0.000` cho $+$Distill trong khi so that la
 `0.015` -- du de doi han cach dien giai.
 
-`check_paper_numbers.py` khong bat duoc vi no chi kiem mot dang ky ~20 diem va so
-sanh chuoi con. Bang phai duoc SINH RA, khong duoc go.
+Bang trong bai duoc sinh tu CSV, khong go tay.
 
 Cach lam: moi bang khai bao nguon CSV va cach xep dong. Script dung lai phan giua
 `\\midrule` dau tien va `\\bottomrule`, roi thay dung phan do trong .tex. Bang van

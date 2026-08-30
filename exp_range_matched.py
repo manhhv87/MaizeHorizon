@@ -17,7 +17,7 @@ Geometry, per clip: the horizon row fixes the tilt, the ground-contact row of ea
 fixes its depression angle, and camera height converts that to distance.
 
     python exp_range_matched.py --labels-dir data/test/labels --images-dir data/test/images \
-        --runs runs --tags stock nearfar --seeds 0 1 2 --out results/scaling/range_matched.csv
+        --runs runs --tags stock nearfar --seeds 0 1 2 3 4 --out results/scaling/range_matched.csv
 
 Matching is imported, never reimplemented.
 """

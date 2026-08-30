@@ -1,4 +1,0 @@
-imgsz,h50_phys_px,h50_phys_px_minn,min_n,n_bins_used,recall_near,recall_mid,recall_far,n_seeds
-1920,44.08,44.08,100,6,0.6952,0.1331,0.0,5
-2560,49.74,49.74,100,6,0.5721,0.1098,nan,5
-3840,68.29,68.29,100,6,0.3973,0.0,nan,5

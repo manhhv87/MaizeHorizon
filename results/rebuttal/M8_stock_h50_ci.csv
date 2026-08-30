@@ -1,2 +1,0 @@
-imgsz,n_seeds,n_box,n_plant,n_clip,h50_mean,plantboot_lo,plantboot_hi,clipboot_lo,clipboot_hi
-1280,5,4067,988,3,47.11,45.6,48.52,41.74,49.5

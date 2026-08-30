@@ -9,8 +9,7 @@
   python reproduce_all.py --skip train counting   # bo vai nhom
 
 `rerun_after_relabel.py` chi phu 13 buoc cua duong phat hien chinh; day la ban day du.
-Moi buoc o day deu ghi CSV, va `check_traceability.py` kiem lai rang moi CSV trong
-results/ truy duoc ve mot lenh.
+Moi buoc o day deu ghi CSV vao results/, la duong tai lap moi so trong bai.
 
 ## Thu tu phu thuoc
 
@@ -245,9 +244,6 @@ def steps(seeds):
             ["plot_cliff.py", "--csv", "results/detection/testset_ceiling_curve.csv",
              "--out", f"{base}/figures/fig_cliff", *extra])
 
-    # ---------- 10. kiem tra ----------
-    add("checks", "traceability", ["check_traceability.py", "--strict"])
-    add("checks", "paper_structure", ["check_paper_structure.py"])
     return out
 
 

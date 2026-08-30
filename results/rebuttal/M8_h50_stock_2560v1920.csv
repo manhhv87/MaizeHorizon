@@ -1,3 +1,0 @@
-conf,tag_a,imgsz_a,tag_b,imgsz_b,n_seeds,n_plant,h50_a,h50_b,delta,delta_lo,delta_hi,p_boot,ket_luan
-0.25,stock,2560,stock,1920,5,988,49.74,44.08,5.66,4.61,7.09,0.0005,KHAC
-0.001,stock,2560,stock,1920,5,988,21.68,20.87,0.81,-0.04,1.56,0.123,khong phan biet duoc
