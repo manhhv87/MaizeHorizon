@@ -64,11 +64,18 @@ def main():
         data[m].sort()
 
     # display names
+    # Thieu mot the o day thi legend in ra THE THO ("nwd"), khong bao loi va rat de
+    # lot: da di qua nhieu lan dung hinh truoc khi co nguoi doc legend.
     NICE = {"stock": "Stock", "nearonly": "+Mint (near-only)", "nearfar": "+Mint",
             "distill": "+Distill", "distill_shuffle": "+Distill (shuffle)",
-            "distill_synth": "+Mint+Distill (synth ctrl)"}
-    ORDER = ["stock", "nearfar", "nearonly", "distill", "distill_shuffle", "distill_synth"]
+            "distill_synth": "+Mint+Distill (synth ctrl)", "nwd": "+NWD"}
+    ORDER = ["stock", "nwd", "nearfar", "nearonly", "distill", "distill_shuffle",
+             "distill_synth"]
     models = sorted(data, key=lambda m: ORDER.index(m) if m in ORDER else 99)
+    unnamed = [m for m in models if m not in NICE]
+    if unnamed:
+        print(f"[!] khong co ten hien thi cho: {', '.join(unnamed)} "
+              f"-> legend se in the tho. Them vao NICE.")
 
     plt.figure(figsize=(6.2, 4.0))
     # shade the far tier (<16px) and mark the floor
@@ -89,12 +96,16 @@ def main():
     plt.xlabel(T["xlabel"])
     plt.ylabel(T["ylabel"])
     plt.ylim(-0.02, 1.08); plt.xlim(0, max(110, max(d[0] for m in models for d in data[m]) + 5))
-    plt.title(a.title or T["title"], fontsize=10)
+    # Khong dat tieu de mac dinh: caption mo ta hinh, va mot cau trong ANH thi
+    # khong tang kiem nao doc duoc. Dat bang --title
+    # neu that su can.
+    if a.title:
+        plt.title(a.title, fontsize=10)
     plt.legend(loc="lower right", fontsize=8, framealpha=0.9)
     plt.grid(alpha=0.25, zorder=0)
     plt.tight_layout()
     for ext in ("pdf", "png"):
-        plt.savefig(f"{a.out}.{ext}", dpi=200)
+        plt.savefig(f"{a.out}.{ext}", dpi=200, bbox_inches="tight", pad_inches=0.02)
     print(f"[OK] -> {a.out}.pdf , {a.out}.png  | arms: {', '.join(models)}")
 
 

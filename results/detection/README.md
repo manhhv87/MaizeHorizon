@@ -62,3 +62,29 @@ Các box không độc lập: khung cách nhau 1/5 giây nên một cây vật l
 ```
 
 Sinh kèm `results/dataset/distinct_plants.csv` (xem README ở đó).
+
+## `pr_far_curve.csv` — đường cong PR tầng xa (dữ liệu của Hình 3)
+
+`plot_pr_far.py --curve-out` ghi đường cong đã nội suy lên lưới 201 điểm recall.
+
+Trước đây script chỉ vẽ hình, không ghi file nào, nên mọi khẳng định trong chú thích Hình 3
+không kiểm lại được bằng gì ngoài việc **nhìn hình**. Và nhìn hình đã sai: chú thích viết
+"+Mint và +Distill nằm dưới Stock trên suốt đường cong", nhưng đối chiếu số cho thấy +Mint
+**vượt lên** ở 11 điểm, trong khoảng recall 0,18–0,27, nhiều nhất +0,04 precision.
+
+```bash
+"$PY" plot_pr_far.py --labels-dir "$LAB" --images-dir "$IMG" --runs runs \
+  --tags stock nwd nearfar distill --seeds 0 1 2 3 4 --iou 0.3 --device 0 \
+  --out paper/figures/fig_pr_far --curve-out results/detection/pr_far_curve.csv
+```
+
+Script tự đối chiếu và in ra khi chạy:
+
+| Nhánh so với Stock | Điểm trên | Điểm dưới | Kết luận |
+|---|---|---|---|
+| `nwd` | **87** | **0** | trội trên toàn bộ |
+| `nearfar` | 11 | 62 | **cắt nhau** |
+| `distill` | 0 | 81 | nằm dưới |
+
+⚠️ Hình này dùng trần **1000** phát hiện mỗi khung (mặc định của `plot_pr_far.py`), khác Hình
+cliff dùng **300**. Cả hai chú thích nay đều nêu rõ trần của mình.

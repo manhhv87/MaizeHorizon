@@ -258,6 +258,7 @@ __pycache__/
 
 # ban thao paper: giu o may, KHONG push len GitHub
 paper/
+/main.pdf
 
 # git history cua fork cu (sao luu cuc bo)
 .git_fork_backup/

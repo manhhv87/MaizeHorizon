@@ -16,17 +16,25 @@ from collections import defaultdict
 # Nhan theo ngon ngu, cho ban tieng Viet cua paper (paper/vi).
 # Mac dinh 'en' nen hinh cua ban English khong doi.
 L10N = {
-    "en": {"suptitle": "Recall by native box height is flat above input 960; "
-                       "recall by input POT merely shifts",
+    "en": {
            "titleA": "(A) Recall vs. pixels-on-target",
            "titleB": "(B) Recall vs. physical box height",
+           "titleC": "(C) Half-recall height vs. input",
+           "xlabelC": "Detector input width (px)",
+           "ylabelC": "$h_{50}$ (px in original frame)",
+           "native": "native",
+           "armMain": "$+$Mint",
            "xlabelA": "Pixels-on-target (box height, px @ eval imgsz)",
            "xlabelB": "Physical box height (px in original frame); smaller = farther",
            "ylabel": "Per-plant recall"},
-    "vi": {"suptitle": "Recall theo chiều cao hộp gốc bằng phẳng trên đầu vào 960; "
-                       "recall theo POT chỉ dịch chỗ",
+    "vi": {
            "titleA": "(A) Recall theo số điểm ảnh trên mục tiêu",
            "titleB": "(B) Recall theo chiều cao hộp gốc",
+           "titleC": "(C) Chiều cao nửa recall theo đầu vào",
+           "xlabelC": "Bề rộng đầu vào của detector (px)",
+           "ylabelC": "$h_{50}$ (px trong khung gốc)",
+           "native": "mức gốc",
+           "armMain": "$+$Mint",
            "xlabelA": "Số điểm ảnh trên mục tiêu (chiều cao hộp, px @ imgsz đánh giá)",
            "xlabelB": "Chiều cao hộp trong khung gốc (px); nhỏ hơn = xa hơn",
            "ylabel": "Recall theo từng cây"},
@@ -65,6 +73,9 @@ def main():
     ap.add_argument("--out", default=None)
     ap.add_argument("--lang", choices=("en", "vi"), default="en", help="ngon ngu nhan truc")
     ap.add_argument("--title", default=None, help="ghi de tieu de (mac dinh: theo --lang)")
+    ap.add_argument("--h50-extra", nargs="*", default=[],
+                    help="nhanh phu cho panel C, dang NHAN=file1.csv[,file2.csv]; "
+                         "nhieu file thi gop lai (vd quet chinh + quet tren muc goc)")
     a = ap.parse_args()
     T = L10N[a.lang]
     out = a.out or f"{a.prefix}_fig"
@@ -80,17 +91,54 @@ def main():
 
     pot = load(f"{a.prefix}_pot.csv")
     phys = load(f"{a.prefix}_phys.csv")
+    # _range.csv chi co mot dong moi imgsz, khong dung `load` duoc
+    import csv as _csv
+    import os as _os
+    def _read_h50(paths):
+        out = {}
+        for q in paths:
+            if not _os.path.exists(q):
+                continue
+            for _r in _csv.DictReader(open(q, encoding="utf-8")):
+                try:
+                    out[int(_r["imgsz"])] = float(_r["h50_phys_px"])
+                except (KeyError, ValueError):
+                    pass
+        return out
+
+    h50s = _read_h50([f"{a.prefix}_range.csv"])
+    series = [(T["armMain"], h50s, "#0072B2", "o")]
+    _pal = ["#D55E00", "#009E73", "#CC79A7"]
+    for _i, spec in enumerate(a.h50_extra):
+        if "=" not in spec:
+            print(f"[!] bo qua --h50-extra {spec!r}: thieu dau '='")
+            continue
+        _lab, _files = spec.split("=", 1)
+        _d = _read_h50(_files.split(","))
+        if _d:
+            series.append((_lab, _d, _pal[_i % len(_pal)], "s^Dv"[_i % 4]))
+        else:
+            print(f"[!] --h50-extra {_lab!r}: khong doc duoc h50 nao")
     imgszs = sorted(set(pot) | set(phys))
     cmap = plt.get_cmap("viridis")
     colors = {im: cmap(i / max(1, len(imgszs) - 1)) for i, im in enumerate(imgszs)}
     markers = ["o", "s", "^", "D", "v", "P", "X"]
 
-    fig, (axA, axB) = plt.subplots(1, 2, figsize=(11, 4.2))
+    # Hai hang. Ba panel canh nhau o \linewidth chi con ~2,1 inch moi cai; hai hang
+    # cho hang tren ~3,1 inch va panel C duoc tron be ngang.
+    if h50s:
+        fig = plt.figure(figsize=(11, 7.4))
+        gs = fig.add_gridspec(2, 2, height_ratios=[1.0, 0.78], hspace=0.34, wspace=0.22)
+        axA = fig.add_subplot(gs[0, 0]); axB = fig.add_subplot(gs[0, 1])
+        axC = fig.add_subplot(gs[1, :])
+    else:
+        fig, (axA, axB) = plt.subplots(1, 2, figsize=(11, 4.2))
+        axC = None
 
     # --- Panel A: recall vs POT (collapse) ---
     axA.axvspan(0, 16, color="#f2c8c8", alpha=0.35, lw=0, zorder=0)
     axA.axvline(16, color="#c0392b", ls="--", lw=1.2, zorder=1)
-    axA.text(16, 1.03, "T=16px", color="#c0392b", ha="center", fontsize=8)
+    axA.text(18, 1.03, "T=16px", color="#c0392b", ha="left", fontsize=8)
     for i, im in enumerate(imgszs):
         if im not in pot:
             continue
@@ -116,17 +164,56 @@ def main():
         axB.fill_between(xs, lo, up, color=colors[im], alpha=0.12, zorder=2)
     axB.axhline(0.5, color="#7f8c8d", ls=":", lw=1.0)
     axB.axvspan(0, 32, color="#f2c8c8", alpha=0.30, lw=0, zorder=0)   # floor vat ly ~24-32px
-    axB.axvline(52, color="#c0392b", ls="--", lw=1.0, zorder=1); axB.text(52, 1.03, "h50~52px", color="#c0392b", ha="center", fontsize=8)
+    axB.axvline(52, color="#c0392b", ls="--", lw=1.0, zorder=1); axB.text(54, 1.03, "$h_{50}$ 52px", color="#c0392b", ha="left", fontsize=8)
     axB.set_xlabel(T["xlabelB"])
     axB.set_ylabel(T["ylabel"])
     axB.set_xlim(0, 160); axB.set_ylim(-0.02, 1.08)
     axB.set_title(T["titleB"], fontsize=10)
     axB.legend(loc="lower right", fontsize=8, framealpha=0.9); axB.grid(alpha=0.25)
 
-    fig.suptitle(a.title or T["suptitle"], fontsize=11)
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    # --- Panel C: h50 theo dau vao. Day la cho DUY NHAT trong hinh nhin thay duoc
+    # diem gay: h50 giam khi dau vao con khoi phuc diem anh cam bien da thu, cham
+    # day tai muc goc, roi tang tro lai khi vuot qua.
+    if axC is not None and h50s:
+        allz = sorted({z for _, d, _, _ in series for z in d})
+        for lab, d, col, mk in series:
+            zs = sorted(d); ys = [d[z] for z in zs]
+            axC.plot(zs, ys, marker=mk, ms=6, lw=1.8, color=col, label=lab, zorder=3)
+            for z, y in zip(zs, ys):
+                axC.annotate(f"{y:.1f}", (z, y), textcoords="offset points",
+                             xytext=(0, 8 if lab == T["armMain"] else -13),
+                             ha="center", fontsize=7.5, color=col)
+            lo = min(ys); best = [z for z in zs if d[z] == lo][0]
+            axC.scatter([best], [lo], s=110, facecolor="none", edgecolor=col,
+                        lw=1.8, zorder=4)
+        zs = allz
+        axC.axvline(1920, color="#c0392b", ls="--", lw=1.1, zorder=1)
+        axC.annotate(T["native"] + " 1920", (1920, axC.get_ylim()[1]),
+                     textcoords="offset points", xytext=(5, -6), ha="left", va="top",
+                     color="#c0392b", fontsize=8.5)
+        if len(series) > 1:
+            axC.legend(loc="upper center", fontsize=9, ncol=len(series), framealpha=0.9)
+        # Log-scale van ve tick PHU co nhan, chong len nhan cua ta ("6x10^0" lan
+        # vao giua "640"). Phai tat han bo dinh vi tick phu.
+        import matplotlib.ticker as mticker
+        axC.set_xscale("log")
+        axC.xaxis.set_major_locator(mticker.FixedLocator(zs))
+        axC.xaxis.set_major_formatter(mticker.FixedFormatter([str(z) for z in zs]))
+        axC.xaxis.set_minor_locator(mticker.NullLocator())
+        axC.tick_params(axis="x", labelsize=8)
+        axC.set_xlabel(T["xlabelC"]); axC.set_ylabel(T["ylabelC"])
+        axC.set_title(T["titleC"], fontsize=10); axC.grid(alpha=0.25)
+        axC.margins(y=0.18)
+
+    # KHONG dat tieu de mac dinh. Caption ngay duoi hinh da mo ta day du, va mot
+    # cau trong ANH thi khong tang kiem nao doc duoc -- da dinh mot lan: tieu de cu
+    # ghi "flat above input 960", than bai da sua tu lau ma cau trong anh van con,
+    # va no chi lo ra khi co nguoi nhin hinh. Neu that su can thi dat bang --title.
+    if a.title:
+        fig.suptitle(a.title, fontsize=11)
+    fig.tight_layout(rect=[0, 0, 1, 0.98 if a.title else 1.0])
     for ext in ("pdf", "png"):
-        fig.savefig(f"{out}.{ext}", dpi=200)
+        fig.savefig(f"{out}.{ext}", dpi=200, bbox_inches="tight", pad_inches=0.02)
     print(f"[OK] -> {out}.pdf , {out}.png")
 
 

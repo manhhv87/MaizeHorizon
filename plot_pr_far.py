@@ -14,6 +14,7 @@ Duong ve la trung binh theo seed tren mot luoi recall chung (noi suy), vung bong
 la +-1 do lech chuan mau.
 """
 import argparse
+import csv
 import os
 
 import numpy as np
@@ -39,6 +40,10 @@ def main():
     ap.add_argument("--weight", default="best.pt")
     ap.add_argument("--lang", choices=("en", "vi"), default="en")
     ap.add_argument("--out", default="fig_pr_far")
+    ap.add_argument("--title", default=None, help="tieu de (mac dinh: khong co)")
+    ap.add_argument("--curve-out", default=None,
+                    help="CSV duong cong PR (tag, recall, precision_mean, precision_sd) "
+                         "de kiem lai cac khang dinh trong chu thich, thay vi phai nhin hinh")
     a = ap.parse_args()
 
     L10N = {"en": dict(x="Recall", y="Precision",
@@ -92,6 +97,28 @@ def main():
             aps[tag] = (float(np.mean([v for _, v in per_seed])),
                         float(np.std([v for _, v in per_seed], ddof=1)) if len(per_seed) > 1 else 0.0)
 
+    if a.curve_out:
+        rows = [["tag", "recall", "precision_mean", "precision_sd"]]
+        for tag in [t for t in a.tags if t in curves]:
+            m, sd = curves[tag]
+            rows += [[tag, round(float(g), 4), round(float(x), 5), round(float(y), 5)]
+                     for g, x, y in zip(grid, m, sd)]
+        os.makedirs(os.path.dirname(a.curve_out) or ".", exist_ok=True)
+        with open(a.curve_out, "w", newline="", encoding="utf-8") as f:
+            csv.writer(f).writerows(rows)
+        print(f"[OK] duong cong -> {a.curve_out}")
+        # Doi chieu ngay hai khang dinh trong chu thich, tren vung recall CO NGHIA
+        # (noi ca hai duong con ton tai), thay vi de nguoi doc tu nhin hinh.
+        if "stock" in curves:
+            st = curves["stock"][0]
+            for tag in [t for t in a.tags if t in curves and t != "stock"]:
+                o = curves[tag][0]
+                live = (st > 0) | (o > 0)
+                above = int(((o > st) & live).sum()); below = int(((o < st) & live).sum())
+                rel = "tren" if above and not below else ("duoi" if below and not above else "cat nhau")
+                print(f"  {tag:16s} so voi stock: {rel:9s} "
+                      f"({above} diem tren, {below} diem duoi tren {int(live.sum())} diem song)")
+
     import matplotlib
     matplotlib.use("Agg")
     # Type 42 (TrueType) cho CA HAI ngon ngu. Truoc day chi bat cho ban tieng Viet
@@ -116,12 +143,17 @@ def main():
         ax.plot(grid, m, STY[i % len(STY)], color=COL[i % len(COL)], lw=1.8, label=lab)
         ax.fill_between(grid, np.maximum(m - sd, 0), np.minimum(m + sd, 1),
                         color=COL[i % len(COL)], alpha=0.15, lw=0)
-    ax.set_xlabel(T["x"]); ax.set_ylabel(T["y"]); ax.set_title(T["t"], fontsize=10)
+    ax.set_xlabel(T["x"]); ax.set_ylabel(T["y"])
+    # Khong dat tieu de mac dinh: caption mo ta hinh, va mot cau trong ANH thi
+    # khong tang kiem nao doc duoc. Dat bang --title
+    # neu that su can.
+    if getattr(a, "title", None):
+        ax.set_title(a.title, fontsize=10)
     ax.set_xlim(0, 1); ax.set_ylim(0, 1.02); ax.grid(alpha=0.25)
     ax.legend(loc="upper right", fontsize=8, framealpha=0.9)
     fig.tight_layout()
     for ext in ("pdf", "png"):
-        fig.savefig(f"{a.out}.{ext}", dpi=200)
+        fig.savefig(f"{a.out}.{ext}", dpi=200, bbox_inches="tight", pad_inches=0.02)
     print(f"[OK] -> {a.out}.pdf , {a.out}.png")
 
 

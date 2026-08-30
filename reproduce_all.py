@@ -234,6 +234,9 @@ def steps(seeds):
         extra = [] if lang == "en" else ["--lang", "vi"]
         add("figures", f"fig_scaling_{lang}",
             ["plot_scaling.py", "--prefix", "results/scaling/scaling",
+             "--h50-extra",
+             "Stock=results/rebuttal/M8_stock_sweep_range.csv,"
+             "results/rebuttal/M8_stock_above_range.csv",
              "--out", f"{base}/figures/fig_scaling", *extra])
         add("figures", f"fig_pr_far_{lang}",
             ["plot_pr_far.py", *L, "--runs", "runs", "--tags", "stock", "nwd", "nearfar", "distill",
