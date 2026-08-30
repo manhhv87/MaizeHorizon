@@ -1,7 +1,6 @@
 # MaizeHorizon
 
-Measuring the binding resolution in far-field per-plant maize detection: network
-input size extends range only when the input binds.
+Sensor pixels or network input: measuring the per-plant maize detection limit.
 
 A forward-facing camera driving down a crop row turns per-plant detection into a
 far-field small-object problem — a distant seedling spans a handful of pixels and
@@ -120,9 +119,8 @@ duplicated.
 
 ```bibtex
 @article{maizehorizon,
-  title  = {Measuring the binding resolution in far-field per-plant maize
-            detection: network input size extends range only when the input
-            binds},
+  title  = {Sensor pixels or network input: measuring the per-plant maize
+            detection limit},
   author = {Hoang, Manh V. and Nguyen, Truong Q.},
   year   = {2026}
 }
